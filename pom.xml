@@ -356,11 +356,10 @@
 
 	<distributionManagement>
 
-		<!-- Overwrite parent release repo to DeltaStream S3 -->
 		<repository>
-			<id>apache.releases.https</id>
-			<name>Apache Release Distribution to DeltaStream Repository</name>
-			<url>s3://deltastream-packages-maven/release</url>
+			<id>github</id>
+			<name>GitHub Packages</name>
+			<url>https://maven.pkg.github.com/deltastreaminc/flink-connector-snowflake</url>
 		</repository>
 
 	</distributionManagement>
