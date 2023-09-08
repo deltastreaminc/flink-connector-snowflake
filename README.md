@@ -1,4 +1,4 @@
-# Apache Flink MongoDB Connector
+# Apache Flink Snowflake Connector
 
 The repository for the Apache Flink Snowflake connector.
 
