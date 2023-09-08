@@ -1,0 +1,91 @@
+package io.deltastream.flink.connector.snowflake.sink;
+
+import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.util.Preconditions;
+import org.apache.flink.util.StringUtils;
+
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
+import io.deltastream.flink.connector.snowflake.sink.context.DefaultSnowflakeSinkContext;
+import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
+
+import java.util.Properties;
+
+/**
+ * Flink Sink to produce data into a Snowflake table. The sink supports below delivery guarantees as
+ * described by {@link org.apache.flink.connector.base.DeliveryGuarantee}.
+ * <li>{@link org.apache.flink.connector.base.DeliveryGuarantee#NONE} does not provide any
+ *     guarantees: messages may be lost in case of issues on the Snowflake ingest channel and
+ *     messages may be duplicated in case of a Flink runtime failure.
+ * <li>{@link org.apache.flink.connector.base.DeliveryGuarantee#AT_LEAST_ONCE} the sink will flush
+ *     data on a checkpoint to ensure all received events have successfully been committed to the
+ *     Snowflake service backend. Ingestion failures are retried to ensure delivery of all received
+ *     events at least once, but data may be duplicated when Flink restarts.
+ *
+ * @param <IN> type of records that the sink receives to serialize and write to the corresponding
+ *     Snowflake table
+ * @see SnowflakeSinkBuilder for constructing this sink
+ */
+public class SnowflakeSink<IN> implements Sink<IN> {
+
+    private static final long serialVersionUID = 3587917829427569404L;
+
+    private final String appId;
+    private final Properties connectionConfigs;
+    private final SnowflakeWriterConfig writerConfig;
+    private final SnowflakeChannelConfig channelConfig;
+    private final SnowflakeRowSerializationSchema<IN> serializationSchema;
+
+    public String getAppId() {
+        return appId;
+    }
+
+    public Properties getConnectionConfigs() {
+        return connectionConfigs;
+    }
+
+    public SnowflakeWriterConfig getWriterConfig() {
+        return writerConfig;
+    }
+
+    public SnowflakeChannelConfig getChannelConfig() {
+        return channelConfig;
+    }
+
+    public SnowflakeRowSerializationSchema<IN> getSerializationSchema() {
+        return serializationSchema;
+    }
+
+    SnowflakeSink(
+            final String appId,
+            final Properties connectionConfigs,
+            final SnowflakeWriterConfig writerConfig,
+            final SnowflakeChannelConfig channelConfig,
+            final SnowflakeRowSerializationSchema<IN> serializationSchema) {
+
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(appId), "An application ID is required");
+        this.appId = appId;
+        this.connectionConfigs = Preconditions.checkNotNull(connectionConfigs);
+        this.writerConfig = Preconditions.checkNotNull(writerConfig);
+        this.channelConfig = Preconditions.checkNotNull(channelConfig);
+        this.serializationSchema = Preconditions.checkNotNull(serializationSchema);
+    }
+
+    public static <IN> SnowflakeSinkBuilder<IN> builder() {
+        return new SnowflakeSinkBuilder<>();
+    }
+
+    @Override
+    public SinkWriter<IN> createWriter(InitContext initContext) {
+        return new SnowflakeSinkWriter<>(
+                new DefaultSnowflakeSinkContext(
+                        Preconditions.checkNotNull(initContext, "initContext"),
+                        this.writerConfig,
+                        this.appId),
+                this.connectionConfigs,
+                this.channelConfig,
+                this.serializationSchema);
+    }
+}
