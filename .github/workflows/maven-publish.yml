@@ -7,6 +7,13 @@ on:
   release:
     types: [created]
 
+env:
+  # env vars for aws cli
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'us-east-2'
+  BUILD_ENV: 's3-actions'
+
 jobs:
   build:
 
@@ -35,7 +42,7 @@ jobs:
 
     - name: Build and Release Artifact
       id: release-jar
-      run: mvn clean deploy -Drevision=${{ github.event.release.tag_name }} -s $GITHUB_WORKSPACE/settings.xml -f pom.xml
+      run: mvn deploy -Drevision=${{ github.event.release.tag_name }} -U -B -ff -fae -s $GITHUB_WORKSPACE/settings.xml -f pom.xml
 
     - name: Slack Report Failure
       if: failure()
