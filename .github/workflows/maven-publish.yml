@@ -22,13 +22,29 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
-        server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
+        server-id: apache.releases.https # Value of the distributionManagement/repository/id field of the pom.xml
         settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-    - name: Build with Maven
-      run: mvn -B package -Drevision=${{ github.event.release.tag_name }} --file pom.xml
+    - name: Configure Maven Settings
+      id: configure-maven
+      uses: DamianReeves/write-file-action@v1.2
+      with:
+        path: ${{ github.workspace }}/settings.xml
+        contents: ${{ secrets.MVN_SETTINGS }}
+        write-mode: overwrite
 
-    - name: Publish to GitHub Packages Apache Maven
-      run: mvn deploy -Drevision=${{ github.event.release.tag_name }} -s $GITHUB_WORKSPACE/settings.xml
+    - name: Build and Release Artifact
+      id: release-jar
+      run: mvn clean deploy -Drevision=${{ github.event.release.tag_name }} -s $GITHUB_WORKSPACE/settings.xml -f pom.xml
+
+    - name: Slack Report Failure
+      if: failure()
+      # https://github.com/marketplace/actions/action-slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        author_name: ${{ github.workflow }}
+        fields: repo,message,commit,author,job,workflow
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        MATRIX_CONTEXT: ${{ toJson(matrix) }}
