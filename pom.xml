@@ -29,8 +29,8 @@
 	</licenses>
 
 	<scm>
-		<url>https://github.com/deltastreaminc/deltastream-api</url>
-		<connection>git@github.com:deltastreaminc/deltastream-api.git</connection>
+		<url>https://github.com/deltastreaminc/flink-connector-snowflake</url>
+		<connection>git@github.com:deltastreaminc/flink-connector-snowflake.git</connection>
 	</scm>
 
 	<properties>
