@@ -17,7 +17,7 @@ public final class SnowflakeWriterConfig implements Serializable {
     private static final long serialVersionUID = 1806512982691643793L;
 
     // buffer flush minimum and default
-    public static final long BUFFER_FLUSH_TIME_MILLISECONDS_DEFAULT = 5000;
+    public static final long BUFFER_FLUSH_TIME_MILLISECONDS_DEFAULT = 1000;
     public static final long BUFFER_FLUSH_TIME_MILLISECONDS_MIN = 10;
 
     private final DeliveryGuarantee deliveryGuarantee;
