@@ -25,7 +25,7 @@ mvn clean package -DskipTests
 
 The resulting JARs can be found in the `target` directory of the respective module.
 
-## Using the SnowflakeSink API
+## Using the `SnowflakeSink` API
 
 ```java
 class test {
@@ -94,4 +94,4 @@ This article describes [how to contribute to Apache Flink](https://flink.apache.
 ## About
 
 Apache Flink is an open source project of The Apache Software Foundation (ASF).
-This connector is an open source project developed at DeltaStream inc for use with the Apache Flink project.
+This connector is an open source project developed at DeltaStream, Inc. for use with the Apache Flink project.
