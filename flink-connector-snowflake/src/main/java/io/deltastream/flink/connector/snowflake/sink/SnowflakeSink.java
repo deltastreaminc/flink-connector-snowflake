@@ -14,6 +14,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package io.deltastream.flink.connector.snowflake.sink;
 
 import org.apache.flink.api.connector.sink2.Sink;
