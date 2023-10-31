@@ -121,8 +121,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
         try {
             this.sinkService.insert(this.serializationSchema.serialize(element, sinkContext));
         } catch (SFException e) {
-            LOGGER.error("Failed to insert row with Snowflake sink service", e);
-            throw new IOException(e);
+            throw new IOException("Failed to insert row with Snowflake sink service", e);
         }
     }
 
