@@ -32,13 +32,19 @@ import java.util.Properties;
 /**
  * Flink Sink to produce data into a Snowflake table. The sink supports below delivery guarantees as
  * described by {@link org.apache.flink.connector.base.DeliveryGuarantee}.
- * <li>{@link org.apache.flink.connector.base.DeliveryGuarantee#NONE} does not provide any
- *     guarantees: messages may be lost in case of issues on the Snowflake ingest channel and
- *     messages may be duplicated in case of a Flink runtime failure.
- * <li>{@link org.apache.flink.connector.base.DeliveryGuarantee#AT_LEAST_ONCE} the sink will flush
- *     data on a checkpoint to ensure all received events have successfully been committed to the
- *     Snowflake service backend. Ingestion failures are retried to ensure delivery of all received
- *     events at least once, but data may be duplicated when Flink restarts.
+ *
+ * <ul>
+ *   {@link org.apache.flink.connector.base.DeliveryGuarantee#NONE} does not provide any guarantees:
+ *   messages may be lost in case of issues on the Snowflake ingest channel and messages may be
+ *   duplicated in case of a Flink runtime failure.
+ * </ul>
+ *
+ * <ul>
+ *   {@link org.apache.flink.connector.base.DeliveryGuarantee#AT_LEAST_ONCE} the sink will flush
+ *   data on a checkpoint to ensure all received events have successfully been committed to the
+ *   Snowflake service backend. Ingestion failures are retried to ensure delivery of all received
+ *   events at least once, but data may be duplicated when Flink restarts.
+ * </ul>
  *
  * @param <IN> type of records that the sink receives to serialize and write to the corresponding
  *     Snowflake table
