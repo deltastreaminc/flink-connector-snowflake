@@ -54,44 +54,46 @@ The following credentials are used in the tests for integrating with the Snowfla
 * `SNOWFLAKE_PRIVATE_KEY`: User's private key to use for connecting to the service
 * `SNOWFLAKE_KEY_PASSPHRASE`: User's private key password to use for connecting to the service
 
-## Developing Flink
-
-The Flink committers use IntelliJ IDEA to develop the Flink codebase.
-We recommend IntelliJ IDEA for developing projects that involve Scala code.
-
-Minimal requirements for an IDE are:
-* Support for Java and Scala (also mixed projects)
-* Support for Maven with Java and Scala
-
 ### IntelliJ IDEA
 
-The IntelliJ IDE supports Maven out of the box and offers a plugin for Scala development:
+The IntelliJ IDE supports Maven out of the box:
 
 * IntelliJ download: [https://www.jetbrains.com/idea/](https://www.jetbrains.com/idea/)
-* IntelliJ Scala Plugin: [https://plugins.jetbrains.com/plugin/?id=1347](https://plugins.jetbrains.com/plugin/?id=1347)
 
-Check out our [Setting up IntelliJ](https://nightlies.apache.org/flink/flink-docs-master/flinkDev/ide_setup.html#intellij-idea) guide for details.
+Setup CheckStyle for static coding guidelines within IntelliJ IDEA:
+
+1. Go to `Settings` → `Tools` → `Checkstyle`.
+2. Set `Scan Scope` to `Only Java sources (including tests)`.
+3. For `Checkstyle Version` select `8.14`.
+4. Under `Configuration File` click the `+` icon to add a new configuration.
+5. Set `Description` to `Flink`.
+6. Select `Use a local Checkstyle file` and point it to tools/maven/checkstyle.xml located within your cloned repository.
+7. Select `Store relative to project location` and click `Next`.
+8. Configure the property checkstyle.suppressions.file with the value suppressions.xml and click `Next`.
+9. Click `Finish`.
+10. Select `Flink` as the only active configuration file and click `Apply`.
+
+You can now import the Checkstyle configuration for the Java code formatter.
+
+1. Go to `Settings` → `Editor` → `Code Style` → `Java`.
+2. Click the gear icon next to `Scheme` and select `Import Scheme` → `Checkstyle Configuration`.
+3. Navigate to and select tools/maven/checkstyle.xml located within your cloned repository.
+
+To verify the setup, click `View` → `Tool Windows` → `Checkstyle` and find the `Check Module` button in the opened tool window. It should report no violations.
 
 ## Support
 
 Don’t hesitate to ask!
 
-Contact the developers and community on the [mailing lists](https://flink.apache.org/community.html#mailing-lists) if you need any help.
-
-[Open an issue](https://issues.apache.org/jira/browse/FLINK) if you found a bug in Flink, or file issues in this repository if you encounter bugs with this connector.
-
-## Documentation
-
-The documentation of Apache Flink is located on the website: [https://flink.apache.org](https://flink.apache.org)
-or in the `docs/` directory of the source code.
+[Open a Flink issue](https://issues.apache.org/jira/browse/FLINK) if you found a bug in Flink, or file issues in this repository if you encounter bugs with this connector.
 
 ## Fork and Contribute
 
 This is an active open-source project. We are always open to people who want to use the system or contribute to it.
-Contact us if you are looking for implementation tasks that fit your skills.
-This article describes [how to contribute to Apache Flink](https://flink.apache.org/contributing/how-to-contribute.html).
+Contact us if you are looking for implementation tasks that fit your development skills.
+
+All pull requests must be accompanied by an issue on GitHub.
 
 ## About
 
-Apache Flink is an open source project of The Apache Software Foundation (ASF).
-This connector is an open source project developed at DeltaStream, Inc. for use with the Apache Flink project.
+This connector is an open source project developed at [DeltaStream, Inc.](https://www.deltastream.io/) for use with the Apache Flink project.
