@@ -148,7 +148,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> database(final String database) {
-        this.database = database;
+        this.database = Preconditions.checkNotNull(database);
         return this;
     }
 
@@ -159,7 +159,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> schema(final String schema) {
-        this.schema = schema;
+        this.schema = Preconditions.checkNotNull(schema);
         return this;
     }
 
@@ -170,7 +170,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> table(final String table) {
-        this.table = table;
+        this.table = Preconditions.checkNotNull(table);
         return this;
     }
 
