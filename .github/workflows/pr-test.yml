@@ -30,6 +30,8 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
         settings-path: ${{ github.workspace }} # location for the settings.xml file
 
     - name: Configure Maven Settings
