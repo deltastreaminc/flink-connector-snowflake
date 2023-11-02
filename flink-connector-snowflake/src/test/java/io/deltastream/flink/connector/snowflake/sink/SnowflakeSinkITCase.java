@@ -52,7 +52,7 @@ class SnowflakeSinkITCase {
                         .bufferTimeMillis(2000L)
                         .database("FLINK_STREAMING")
                         .schema("PUBLIC")
-                        .table("stream_data_tbl")
+                        .table("\"stream_data_tbl\"") // case-sensitive table name
                         .serializationSchema(new RowPassThroughSerializer());
 
         // add private key, if any
@@ -77,7 +77,11 @@ class SnowflakeSinkITCase {
 
     protected static Map<String, Object> buildRow(final Long id) {
         final String uuid = UUID.randomUUID().toString();
-        return Map.of("id", uuid + "-" + id, "data", uuid + "_" + id);
+        return Map.of(
+                "\"id\"",
+                uuid + "-" + id,
+                "\"data\"",
+                uuid + "_" + id); // case-sensitive column names
     }
 
     private static class SfRowMapFunction implements MapFunction<Long, Map<String, Object>> {
