@@ -37,9 +37,17 @@ public final class SnowflakeChannelConfig implements Serializable {
 
     private static final long serialVersionUID = 3517937247835076255L;
 
+    /**
+     * Table name parts are treated as case-insensitive by Snowflake, meaning that the service will
+     * treat them as UPPER_CASE, unless surrounded by double quotes, e.g. `DB.SCHEMA."table"`. The
+     * same name without double quotes will be replaced by its uppercase version, e.g.
+     * `DB.SCHEMA.TABLE`.
+     */
     private final String databaseName;
+
     private final String schemaName;
     private final String tableName;
+
     private final OpenChannelRequest.OnErrorOption onErrorOption;
 
     public String getDatabaseName() {
