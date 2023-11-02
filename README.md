@@ -46,7 +46,9 @@ class test {
 
 In Snowflake, the full name of a table is case-insensitive, but UPPER_CASE biased. In other words, a sink configured with a fully qualified name of `DB.SCHEMA.table` is treated as `DB.SCHEMA.TABLE`. To be able to use case-sensitive name parts, add double quotes around them to be treated as the literal name, e.g. `DB.SCHEMA."table"`.
 
-## Required Credentials
+## Testing
+
+### Required Credentials
 
 The following credentials are used in the tests for integrating with the Snowflake service:
 
@@ -56,7 +58,15 @@ The following credentials are used in the tests for integrating with the Snowfla
 * `SNOWFLAKE_PRIVATE_KEY`: User's private key to use for connecting to the service
 * `SNOWFLAKE_KEY_PASSPHRASE`: User's private key password to use for connecting to the service
 
-### IntelliJ IDEA
+### Integration Test
+
+Using the Required Credentials, test a simple write to the configured Snowflake account:
+
+```shell
+mvn clean compile failsafe:integration-test
+```
+
+## IntelliJ IDEA
 
 The IntelliJ IDE supports Maven out of the box:
 
