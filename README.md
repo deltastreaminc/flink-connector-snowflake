@@ -36,13 +36,15 @@ class test {
             .user("user_name")
             .role("role_name")
             .bufferTimeMillis(2000L)
-            .database("db_name")
-            .schema("schema_name")
-            .table("table_name")
+            .database("DB_NAME")
+            .schema("SCHEMA_NAME")
+            .table("TABLE_NAME")
             .serializationSchema(SnowflakeRowSerializationSchemaImpl)
             .build("job_name_or_id");
 }
 ```
+
+In Snowflake, the full name of a table is case-insensitive, but UPPER_CASE biased. In other words, a sink configured with a fully qualified name of `DB.SCHEMA.table` is treated as `DB.SCHEMA.TABLE`. To be able to use case-sensitive name parts, add double quotes around them to be treated as the literal name, e.g. `DB.SCHEMA."table"`.
 
 ## Required Credentials
 
