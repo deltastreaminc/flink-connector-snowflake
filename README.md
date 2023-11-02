@@ -66,12 +66,6 @@ Using the Required Credentials, test Snowflake integration with a simple write t
 mvn clean test-compile failsafe:integration-test
 ```
 
-Or, run all tests in the same phase:
-
-```shell
-mvn clean integration-test
-```
-
 Unit tests are run in the `test` phase:
 
 ```shell
