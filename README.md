@@ -60,11 +60,25 @@ The following credentials are used in the tests for integrating with the Snowfla
 
 ### Integration Test
 
-Using the Required Credentials, test a simple write to the configured Snowflake account:
+Using the Required Credentials, test Snowflake integration with a simple write to the configured Snowflake account:
 
 ```shell
-mvn clean compile failsafe:integration-test
+mvn clean test-compile failsafe:integration-test
 ```
+
+Or, run all tests in the same phase:
+
+```shell
+mvn clean integration-test
+```
+
+Unit tests are run in the `test` phase:
+
+```shell
+mvn clean test
+```
+
+To debug issues with the tests, set the `rootLogger.level` in the `flink-connector-snowflake/src/test/resources/log4j2-test.properties` to `INFO` or `DEBUG`.
 
 ## IntelliJ IDEA
 
