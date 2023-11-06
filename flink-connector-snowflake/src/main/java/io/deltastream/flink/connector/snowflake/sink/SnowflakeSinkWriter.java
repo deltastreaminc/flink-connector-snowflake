@@ -106,8 +106,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     @Override
-    public void write(IN element, Context context)
-            throws IOException, InterruptedException {
+    public void write(IN element, Context context) throws IOException, InterruptedException {
 
         /*
          * Send to the service for eventual write

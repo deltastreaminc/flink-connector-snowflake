@@ -181,14 +181,16 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 ((CompletableFuture<?>) flushRes).get();
                 LOGGER.info("Successfully flushed channel '{}'", this.getChannelName());
             } catch (InterruptedException | ExecutionException e) {
-                // TODO reopen channel: https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
+                // TODO reopen channel:
+                // https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
                 LOGGER.warn(
                         "Snowflake channel flush did not finish successfully;"
                                 + "Flush will happen within the next buffer time of {}ms",
                         this.getWriterConfig().getMaxBufferTimeMs());
             }
         } else {
-            // TODO reopen channel: https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
+            // TODO reopen channel:
+            // https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
             LOGGER.warn(
                     "Snowflake channel flush did not return a handle to wait on: got {};"
                             + "Flush will happen within the next buffer time of {}ms",
