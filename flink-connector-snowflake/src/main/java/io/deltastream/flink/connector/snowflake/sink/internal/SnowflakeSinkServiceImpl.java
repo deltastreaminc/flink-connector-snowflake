@@ -45,6 +45,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -166,12 +167,34 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             return;
         }
 
-        LOGGER.info("Flushing Snowflake ingest channel '{}'", this.getChannelName());
-        invoke(
-                this.getChannel(),
-                "flush",
-                Lists.newArrayList(boolean.class).toArray(Class<?>[]::new),
-                Lists.newArrayList(false).toArray());
+        LOGGER.debug("Flushing Snowflake ingest channel '{}'", this.getChannelName());
+        final Object flushRes =
+                invoke(
+                        this.getChannel(),
+                        "flush",
+                        Lists.newArrayList(boolean.class).toArray(Class<?>[]::new),
+                        Lists.newArrayList(false).toArray());
+
+        // wait for flush, unless the result wasn't a future
+        if (flushRes instanceof CompletableFuture) {
+            try {
+                ((CompletableFuture<?>) flushRes).get();
+                LOGGER.info("Successfully flushed channel '{}'", this.getChannelName());
+            } catch (InterruptedException | ExecutionException e) {
+                // TODO reopen channel: https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
+                LOGGER.warn(
+                        "Snowflake channel flush did not finish successfully;"
+                                + "Flush will happen within the next buffer time of {}ms",
+                        this.getWriterConfig().getMaxBufferTimeMs());
+            }
+        } else {
+            // TODO reopen channel: https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
+            LOGGER.warn(
+                    "Snowflake channel flush did not return a handle to wait on: got {};"
+                            + "Flush will happen within the next buffer time of {}ms",
+                    flushRes.getClass().getSimpleName(),
+                    this.getWriterConfig().getMaxBufferTimeMs());
+        }
     }
 
     SnowflakeStreamingIngestClient createClientFromConfig(
