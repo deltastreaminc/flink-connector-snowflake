@@ -106,13 +106,8 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     @Override
-    public synchronized void write(IN element, Context context)
+    public void write(IN element, Context context)
             throws IOException, InterruptedException {
-
-        // wait for checkpoint to finish
-        while (checkpointInProgress) {
-            this.sinkContext.getInitContext().getMailboxExecutor().yield();
-        }
 
         /*
          * Send to the service for eventual write
@@ -126,7 +121,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     @Override
-    public synchronized void flush(boolean endOfInput) throws IOException {
+    public void flush(boolean endOfInput) throws IOException {
         LOGGER.debug(
                 "Sink writer flush was triggered [endOfInput={}, flushOnCheckpoint={}]",
                 endOfInput,
@@ -140,7 +135,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     @Override
-    public synchronized void close() throws Exception {
+    public void close() throws Exception {
         /*
          * Underlying Snowflake SnowflakeStreamingIngestChannel.close() promises full commit before closing, so there
          * isn't a need for flushing previously buffered data when closing the sink service
