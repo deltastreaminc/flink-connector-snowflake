@@ -30,7 +30,7 @@ jobs:
 
     - name: Test and Build Artifact
       id: build
-      run:
+      run: |
         mvn package \
           -Drevision=${{ github.event.pull_request.head.sha }} \
           -U -B -ff -fae \
