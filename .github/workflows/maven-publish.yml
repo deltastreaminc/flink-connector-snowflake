@@ -35,12 +35,13 @@ jobs:
     - name: Build and Release Artifact
       id: release-jar
       run: |
-        mvn deploy -P docs-and-source,release \
-          -Drevision=${{ github.event.release.tag_name }} \
-          -U -B -ff -fae \
-          -s $GITHUB_WORKSPACE/settings.xml \
-          -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }} \
-          -f pom.xml
+        cd flink-connector-snowflake && \
+          mvn deploy -P docs-and-source,release \
+            -Drevision=${{ github.event.release.tag_name }} \
+            -U -B -ff -fae \
+            -s $GITHUB_WORKSPACE/settings.xml \
+            -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }} \
+            -f pom.xml
       env:
         MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
         MAVEN_PASSWORD: ${{ secrets.OSSRH_PASS }}
