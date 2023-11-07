@@ -17,6 +17,7 @@
 
 package io.deltastream.flink.connector.snowflake.sink.serialization;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
@@ -31,6 +32,7 @@ import java.util.Map;
  *
  * @param <T> type of the data to be serialized by the implementation of this interface
  */
+@PublicEvolving
 public interface SnowflakeRowSerializationSchema<T> extends Serializable {
 
     /**

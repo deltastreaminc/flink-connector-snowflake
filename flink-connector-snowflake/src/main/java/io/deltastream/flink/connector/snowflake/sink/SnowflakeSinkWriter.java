@@ -17,6 +17,7 @@
 
 package io.deltastream.flink.connector.snowflake.sink;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -45,6 +46,7 @@ import java.util.Properties;
  *
  * @param <IN> The type of input elements.
  */
+@Internal
 class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SnowflakeSinkWriter.class);

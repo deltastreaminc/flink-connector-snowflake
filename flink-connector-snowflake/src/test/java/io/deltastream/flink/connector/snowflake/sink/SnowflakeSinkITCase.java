@@ -43,6 +43,14 @@ class SnowflakeSinkITCase {
     @Test
     public void testSuccessfulWriteToSnowflake() throws Exception {
 
+        /*
+         * Writes to a table with the following DDL:
+         * CREATE OR REPLACE TABLE FLINK_STREAMING.PUBLIC."stream_data_tbl" (
+         *      "id" VARCHAR(16777216),
+         *      "data" VARCHAR(16777216)
+         * );
+         */
+
         // create a Sink with no-op write/flush to external
         final SnowflakeSinkBuilder<Map<String, Object>> sinkBuilder =
                 SnowflakeSink.<Map<String, Object>>builder()

@@ -17,6 +17,7 @@
 
 package io.deltastream.flink.connector.snowflake.sink;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.util.Preconditions;
@@ -50,6 +51,7 @@ import java.util.Properties;
  *     Snowflake table
  * @see SnowflakeSinkBuilder for constructing this sink
  */
+@PublicEvolving
 public class SnowflakeSink<IN> implements Sink<IN> {
 
     private static final long serialVersionUID = 3587917829427569404L;
