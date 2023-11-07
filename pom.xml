@@ -71,6 +71,9 @@
 		<slf4j.version>1.7.36</slf4j.version>
 		<log4j.version>2.17.2</log4j.version>
 		<jsr305.version>1.3.9</jsr305.version>
+
+		<checksum-maven-plugin.version>1.11</checksum-maven-plugin.version>
+		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
 	</properties>
 
 	<modules>
@@ -282,6 +285,36 @@
 	</dependencyManagement>
 
 	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>net.nicoulaj.maven.plugins</groupId>
+					<artifactId>checksum-maven-plugin</artifactId>
+					<version>${checksum-maven-plugin.version}</version>
+					<executions>
+						<execution>
+							<phase>package</phase>
+							<goals>
+								<goal>artifacts</goal>
+							</goals>
+						</execution>
+					</executions>
+					<configuration>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.sonatype.plugins</groupId>
+					<artifactId>nexus-staging-maven-plugin</artifactId>
+					<version>${nexus-staging-maven-plugin.version}</version>
+					<extensions>true</extensions>
+					<configuration>
+						<serverId>ossrh</serverId>
+						<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+						<autoReleaseAfterClose>true</autoReleaseAfterClose>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 		<plugins>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -361,25 +394,5 @@
 			</plugin>
 		</plugins>
 
-		<!-- Allow the distribution to happen through Amazon S3 -->
-		<extensions>
-			<extension>
-				<groupId>com.github.seahen</groupId>
-				<artifactId>maven-s3-wagon</artifactId>
-				<version>1.3.3</version>
-			</extension>
-		</extensions>
-
 	</build>
-
-	<distributionManagement>
-
-		<!-- Overwrite parent release repo to DeltaStream S3 -->
-		<repository>
-			<id>apache.releases.https</id>
-			<name>Apache Release Distribution to DeltaStream Repository</name>
-			<url>s3://deltastream-packages-maven/release</url>
-		</repository>
-
-	</distributionManagement>
 </project>

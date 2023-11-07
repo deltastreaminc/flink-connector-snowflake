@@ -32,6 +32,29 @@
     <name>Flink : Connectors : Snowflake</name>
     <packaging>jar</packaging>
     <version>${revision}</version>
+    <description>An Apache Flink connector for integrating with Snowflake.</description>
+    <url>https://github.com/deltastreaminc/flink-connector-snowflake</url>
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Mohsen Rezaei</name>
+            <email>mohsenrezaeithe@gmail.com</email>
+            <organization>DeltaStream Inc.</organization>
+            <organizationUrl>https://www.deltastream.io/</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/deltastreaminc/flink-connector-snowflake.git</connection>
+        <developerConnection>scm:git:ssh://github.com:deltastreaminc/flink-connector-snowflake.git</developerConnection>
+        <url>https://github.com/deltastreaminc/flink-connector-snowflake</url>
+    </scm>
 
     <dependencies>
 
@@ -118,6 +141,10 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>net.nicoulaj.maven.plugins</groupId>
+                <artifactId>checksum-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
             </plugin>
@@ -165,6 +192,30 @@
                                     <shadedPattern>org.apache.flink.shaded.net.snowflake</shadedPattern>
                                 </relocation>
                             </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.5</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
                         </configuration>
                     </execution>
                 </executions>
