@@ -32,6 +32,29 @@
     <name>Flink : Connectors : Snowflake</name>
     <packaging>jar</packaging>
     <version>${revision}</version>
+    <description>An Apache Flink connector for integrating with Snowflake.</description>
+    <url>https://github.com/deltastreaminc/flink-connector-snowflake</url>
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Mohsen Rezaei</name>
+            <email>mohsenrezaeithe@gmail.com</email>
+            <organization>DeltaStream Inc.</organization>
+            <organizationUrl>https://www.deltastream.io/</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/deltastreaminc/flink-connector-snowflake.git</connection>
+        <developerConnection>scm:git:ssh://github.com:deltastreaminc/flink-connector-snowflake.git</developerConnection>
+        <url>https://github.com/deltastreaminc/flink-connector-snowflake</url>
+    </scm>
 
     <dependencies>
 
