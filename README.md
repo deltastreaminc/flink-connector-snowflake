@@ -105,14 +105,14 @@ To verify the setup, click `View` → `Tool Windows` → `Checkstyle` and find t
 
 Don’t hesitate to ask!
 
-[Open a Flink issue](https://issues.apache.org/jira/browse/FLINK) if you found a bug in Flink, or file issues in this repository if you encounter bugs with this connector.
+[Open a Flink issue](https://issues.apache.org/jira/browse/FLINK) if you found a bug in Flink or this connector.
 
 ## Fork and Contribute
 
 This is an active open-source project. We are always open to people who want to use the system or contribute to it.
 Contact us if you are looking for implementation tasks that fit your development skills.
 
-All pull requests must be accompanied by an issue on GitHub.
+All pull requests must be accompanied by a [JIRA issue](https://issues.apache.org/jira/projects/FLINK/issues). Pull-request guidelines are provided when opening a new one.
 
 ## About
 
