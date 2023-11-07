@@ -4,13 +4,6 @@ on:
   release:
     types: [created]
 
-env:
-  # env vars for AWS CLI
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_DEFAULT_REGION: 'us-east-2'
-  BUILD_ENV: 's3-actions'
-
 jobs:
   build:
 
@@ -23,34 +16,31 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+
     - name: Set up JDK 11
       uses: actions/setup-java@v3
       with:
         java-version: '11'
         distribution: 'temurin'
-        server-id: apache.releases.https # Value of the distributionManagement/repository/id field of the pom.xml
+        server-id: ossrh
+        server-username: MAVEN_USERNAME
+        server-password: MAVEN_PASSWORD
         settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-    - name: Configure Maven Settings
-      id: configure-maven
-      uses: DamianReeves/write-file-action@v1.2
-      with:
-        path: ${{ github.workspace }}/settings.xml
-        contents: ${{ secrets.MVN_SETTINGS }}
-        write-mode: overwrite
+    - name: Install GPG secret key
+      id: install-secret-key
+      run:
+        cat <(echo -e "${{ secrets.OSSRH_GPG_SECRET_KEY }}") | gpg --batch --import
 
     - name: Build and Release Artifact
       id: release-jar
-      run: mvn deploy -Drevision=${{ github.event.release.tag_name }} -U -B -ff -fae -s $GITHUB_WORKSPACE/settings.xml -f pom.xml
-
-    - name: Slack Report Failure
-      if: failure()
-      # https://github.com/marketplace/actions/action-slack
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        author_name: ${{ github.workflow }}
-        fields: repo,message,commit,author,job,workflow
+      run: |
+        mvn deploy -P docs-and-source,release \
+          -Drevision=${{ github.event.release.tag_name }} \
+          -U -B -ff -fae \
+          -s $GITHUB_WORKSPACE/settings.xml \
+          -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }} \
+          -f pom.xml
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        MATRIX_CONTEXT: ${{ toJson(matrix) }}
+        MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+        MAVEN_PASSWORD: ${{ secrets.OSSRH_PASS }}
