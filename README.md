@@ -25,6 +25,21 @@ mvn clean package -DskipTests
 
 The resulting JARs can be found in the `target` directory of the respective module.
 
+## Maven Dependency
+
+The Snowflake connector can be imported into a Maven project using the following dependency:
+
+```xml
+<!-- https://mvnrepository.com/artifact/io.deltastream/flink-connector-snowflake -->
+<dependency>
+    <groupId>io.deltastream</groupId>
+    <artifactId>flink-connector-snowflake</artifactId>
+    <version>${flink-connector-snowflake.version}</version>
+</dependency>
+```
+
+Define a `flink-connector-snowflake.version` property in the `pom.xml` of the Maven project or replace `${flink-connector-snowflake.version}` with a version from [the Maven Central repository](https://mvnrepository.com/artifact/io.deltastream/flink-connector-snowflake).
+
 ## Using the `SnowflakeSink` API
 
 ```java
