@@ -17,7 +17,6 @@
 
 package io.deltastream.flink.connector.snowflake.sink;
 
-import net.snowflake.ingest.utils.Constants;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.connector.base.DeliveryGuarantee;
@@ -29,6 +28,7 @@ import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConf
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
 import net.snowflake.ingest.streaming.OpenChannelRequest;
+import net.snowflake.ingest.utils.Constants;
 
 import java.util.List;
 import java.util.Properties;
