@@ -17,6 +17,7 @@
 
 package io.deltastream.flink.connector.snowflake.sink;
 
+import net.snowflake.ingest.utils.Constants;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.connector.base.DeliveryGuarantee;
@@ -40,11 +41,11 @@ import java.util.Properties;
 @PublicEvolving
 public class SnowflakeSinkBuilder<IN> {
 
-    static final String SNOWFLAKE_URL_CONFIG_NAME = "url";
-    static final String SNOWFLAKE_USER_CONFIG_NAME = "user";
-    static final String SNOWFLAKE_ROLE_CONFIG_NAME = "role";
-    static final String SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME = "private_key";
-    static final String SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME = "snowflake.private.key.passphrase";
+    static final String SNOWFLAKE_URL_CONFIG_NAME = Constants.ACCOUNT_URL;
+    static final String SNOWFLAKE_USER_CONFIG_NAME = Constants.USER;
+    static final String SNOWFLAKE_ROLE_CONFIG_NAME = Constants.ROLE;
+    static final String SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME = Constants.PRIVATE_KEY;
+    static final String SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME = Constants.PRIVATE_KEY_PASSPHRASE;
 
     /**
      * At minimum, needs to include the required properties as documented by Snowflake: <a
