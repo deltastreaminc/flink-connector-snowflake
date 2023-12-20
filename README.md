@@ -61,6 +61,10 @@ class test {
 
 In Snowflake, the full name of a table is case-insensitive, but UPPER_CASE biased. In other words, a sink configured with a fully qualified name of `DB.SCHEMA.table` is treated as `DB.SCHEMA.TABLE`. To be able to use case-sensitive name parts, add double quotes around them to be treated as the literal name, e.g. `DB.SCHEMA."table"`.
 
+## Checkpointing with Flink
+
+It's highly recommended that any checkpointing that happens using this connector to be configured to be at least 1 second to properly [optimize cost and performance](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-recommendation).
+
 ## Testing
 
 ### Required Credentials
