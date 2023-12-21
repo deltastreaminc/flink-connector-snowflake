@@ -6,7 +6,7 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
-import org.apache.flink.shaded.guava30.com.google.common.collect.Maps;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
 
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
