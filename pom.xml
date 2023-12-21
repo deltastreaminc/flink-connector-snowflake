@@ -53,6 +53,11 @@
 	<properties>
 		<revision>1.0-SNAPSHOT</revision>
 
+		<!-- Java versions -->
+		<java.version>17</java.version>
+		<maven.compiler.release>${java.version}</maven.compiler.release>
+		<target.java.version>${java.version}</target.java.version>
+
 		<flink.version>1.18.0</flink.version>
 		<kryo.version>2.24.0</kryo.version>
 		<objenesis.version>2.1</objenesis.version>
@@ -74,6 +79,9 @@
 
 		<checksum-maven-plugin.version>1.11</checksum-maven-plugin.version>
 		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
+		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+		<maven-shade-plugin.version>3.3.0</maven-shade-plugin.version>
+
 	</properties>
 
 	<modules>
@@ -365,10 +373,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<source>11</source>
-					<target>11</target>
-				</configuration>
+				<version>${maven-compiler-plugin.version}</version>
 			</plugin>
 
 			<plugin>
@@ -386,6 +391,25 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>enforce-maven</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireMavenVersion>
+									<!-- maven version must be at least 3.2.5 -->
+									<version>[3.2.5,)</version>
+								</requireMavenVersion>
+								<requireJavaVersion>
+									<version>17</version>
+								</requireJavaVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 
 			<plugin>
