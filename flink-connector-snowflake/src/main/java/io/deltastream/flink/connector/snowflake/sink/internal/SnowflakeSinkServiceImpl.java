@@ -175,18 +175,13 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         Lists.newArrayList(boolean.class).toArray(Class<?>[]::new),
                         Lists.newArrayList(false).toArray());
 
-        // wait for flush, unless the result wasn't a future
+        // wait for flush, otherwise fail the checkpoint
         if (flushRes instanceof CompletableFuture) {
             try {
                 ((CompletableFuture<?>) flushRes).get();
                 LOGGER.info("Successfully flushed channel '{}'", this.getChannelName());
             } catch (InterruptedException | ExecutionException e) {
-                // TODO reopen channel:
-                // https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
-                LOGGER.warn(
-                        "Snowflake channel flush did not finish successfully;"
-                                + "Flush will happen within the next buffer time of {}ms",
-                        this.getWriterConfig().getMaxBufferTimeMs());
+                throw new IOException("Snowflake channel flush did not finish successfully", e);
             }
         } else {
             throw new IOException(
