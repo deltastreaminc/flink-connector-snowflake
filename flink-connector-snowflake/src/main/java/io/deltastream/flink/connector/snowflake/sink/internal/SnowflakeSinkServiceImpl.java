@@ -153,7 +153,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     }
 
     @Override
-    public void flush() {
+    public void flush() throws IOException {
 
         /*
          * The ingest channel periodically flushes data based on the buffer configuration, and
@@ -189,13 +189,10 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         this.getWriterConfig().getMaxBufferTimeMs());
             }
         } else {
-            // TODO reopen channel:
-            // https://github.com/deltastreaminc/flink-connector-snowflake/issues/11
-            LOGGER.warn(
-                    "Snowflake channel flush did not return a handle to wait on: got {};"
-                            + "Flush will happen within the next buffer time of {}ms",
-                    flushRes.getClass().getSimpleName(),
-                    this.getWriterConfig().getMaxBufferTimeMs());
+            throw new IOException(
+                    String.format(
+                            "Snowflake channel flush did not return a handle to wait on: got %s",
+                            flushRes.getClass().getSimpleName()));
         }
     }
 
