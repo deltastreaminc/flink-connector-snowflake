@@ -27,8 +27,6 @@ import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
-import dev.failsafe.Failsafe;
-import dev.failsafe.Fallback;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 import net.snowflake.ingest.streaming.InsertValidationResponse;
@@ -36,6 +34,7 @@ import net.snowflake.ingest.streaming.OpenChannelRequest;
 import net.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
 import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import net.snowflake.ingest.utils.SFException;
+import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +64,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     private final SnowflakeStreamingIngestClient client;
     // A channel name computed from a unique ingestion name and subtask ID
     private final String channelName;
+    // The expected offset to be committed by the Snowpipe channel
+    private long offset;
 
     /**
      * 1-1 mapping between client/channel/flink subtask Channel for communicating with the Snowflake
@@ -126,6 +127,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 this.getChannelName(),
                 this.getClient().getName());
         this.channel = Preconditions.checkNotNull(this.openChannelFromConfig());
+        this.offset = getLatestCommittedOffsetFromSnowflakeIngestChannel();
 
         // metrics counters
         final SinkWriterMetricGroup sinkMetricGroup =
@@ -136,19 +138,23 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
     @Override
     public void insert(Map<String, Object> row) throws IOException {
+        try {
+            this.offset++;
+            InsertValidationResponse response = this.channel.insertRow(row, Long.toString(offset));
+            this.numRecordsSendCounter.inc();
+            LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
 
-        // send row to ingest channel in a fallback
-        InsertValidationResponse response = this.insertRowWithFallback(row);
-        this.numRecordsSendCounter.inc();
-        LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
-
-        // handle possible errors
-        if (response.hasErrors()) {
-            LOGGER.debug(
-                    "Encountered error on row submission to Snowflake ingest channel '{}'",
-                    this.getChannelName());
-            this.numRecordsSendError.inc(response.getErrorRowCount());
-            this.handleInsertRowsErrors(response.getInsertErrors());
+            // handle possible errors
+            if (ObjectUtils.isNotEmpty(response) && response.hasErrors()) {
+                LOGGER.debug(
+                        "Encountered error on row submission to Snowflake ingest channel '{}'",
+                        this.getChannelName());
+                this.numRecordsSendError.inc(response.getErrorRowCount());
+                this.handleInsertRowsErrors(response.getInsertErrors());
+            }
+        } catch (SFException e) {
+            // SFException can be thrown by insertRow()
+            throw new IOException("Failed to insert row with Snowflake sink service", e);
         }
     }
 
@@ -168,6 +174,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         }
 
         LOGGER.debug("Flushing Snowflake ingest channel '{}'", this.getChannelName());
+
         final Object flushRes =
                 invoke(
                         this.getChannel(),
@@ -189,6 +196,17 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                             "Snowflake channel flush did not return a handle to wait on: got %s",
                             flushRes.getClass().getSimpleName()));
         }
+
+        while (this.getLatestCommittedOffsetFromSnowflakeIngestChannel() < this.offset) {
+            try {
+                LOGGER.info(
+                        "Sleeping 1000ms to allow Snowflake ingest channel committed offsets to catch up");
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                LOGGER.warn(
+                        "Thread sleep interrupted while waiting for Snowflake records to flush");
+            }
+        }
     }
 
     SnowflakeStreamingIngestClient createClientFromConfig(
@@ -206,7 +224,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      *
      * @return {@link SnowflakeStreamingIngestChannel}
      */
-    private SnowflakeStreamingIngestChannel openChannelFromConfig() {
+    SnowflakeStreamingIngestChannel openChannelFromConfig() {
         OpenChannelRequest channelRequest =
                 OpenChannelRequest.builder(this.getChannelName())
                         .setDBName(this.getChannelConfig().getDatabaseName())
@@ -274,47 +292,24 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 errors.get(0).getException());
     }
 
-    /**
-     * Reopen the ingestion channel on {@link SFException} using {@link dev.failsafe.Fallback}.
-     *
-     * @param row {@link java.util.Map} to send to Snowflake for eventual flush
-     * @return {@link InsertValidationResponse}
-     */
-    private InsertValidationResponse insertRowWithFallback(final Map<String, Object> row) {
-        Fallback<Object> reopenChannelFallbackExecutorForInsertRows =
-                Fallback.builder(
-                                attempt -> {
-                                    this.ingestionFallbackSupplier(attempt.getLastException());
-                                })
-                        .handle(SFException.class)
-                        .onFailedAttempt(
-                                event ->
-                                        LOGGER.warn(
-                                                "Failed to send row to ingest channel",
-                                                event.getLastException()))
-                        .onFailure(
-                                event ->
-                                        LOGGER.error(
-                                                String.format(
-                                                        "[INSERT_ROW_FALLBACK] Failed to re-open channel '%s'",
-                                                        this.getChannelName()),
-                                                event.getException()))
-                        .build();
-
-        return Failsafe.with(reopenChannelFallbackExecutorForInsertRows)
-                .get(() -> this.channel.insertRow(row, null));
-    }
-
-    /**
-     * Fail on any errors that may have happened during ingestion to the Snowflake service.
-     *
-     * @param throwable {@link Throwable}
-     */
-    private void ingestionFallbackSupplier(final Throwable throwable) {
-        LOGGER.warn(
-                "[INSERT_ROWS_FALLBACK] Failed to insert row with channel '{}'. Exiting with error",
-                this.getChannelName());
-        throw new RuntimeException(throwable);
+    private long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
+        Map<String, String> offsetTokens =
+                this.getClient().getLatestCommittedOffsetTokens(List.of(this.getChannel()));
+        Preconditions.checkState(
+                offsetTokens.size() == 1,
+                String.format(
+                        "Expected getLatestCommittedOffsetTokens to return information for a single channel. Found %s offset tokens.",
+                        offsetTokens.size()));
+        String offsetToken = offsetTokens.get(offsetTokens.keySet().iterator().next());
+        try {
+            return ObjectUtils.isEmpty(offsetToken) ? 0 : Long.parseLong(offsetToken);
+        } catch (NumberFormatException e) {
+            LOGGER.error(
+                    "The offsetToken string does not contain a parsable long:{} for channel:{}",
+                    offsetToken,
+                    this.getChannelName());
+            throw e;
+        }
     }
 
     /**
