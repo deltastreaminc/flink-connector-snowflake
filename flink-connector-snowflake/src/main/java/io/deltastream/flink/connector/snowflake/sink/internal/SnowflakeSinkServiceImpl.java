@@ -116,12 +116,12 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             SinkWriterMetricGroup metricGroup) {
         this.writerConfig = Preconditions.checkNotNull(writerConfig, "writerConfig");
         this.channelConfig = Preconditions.checkNotNull(channelConfig, "channelConfig");
+        this.channelName = SnowflakeInternalUtils.createClientOrChannelName(null, appId, taskId);
 
         // ingest client
         this.client = this.createClientFromConfig(appId, connectionConfig);
 
         // ingest channel
-        this.channelName = SnowflakeInternalUtils.createClientOrChannelName(null, appId, taskId);
         LOGGER.info(
                 "Opening a new ingest channel '{}' for the client '{}'",
                 this.getChannelName(),
@@ -140,7 +140,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     public void insert(Map<String, Object> row) throws IOException {
         try {
             this.offset++;
-            InsertValidationResponse response = this.channel.insertRow(row, Long.toString(offset));
+            InsertValidationResponse response =
+                    this.getChannel().insertRow(row, Long.toString(offset));
             this.numRecordsSendCounter.inc();
             LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
 
@@ -292,7 +293,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 errors.get(0).getException());
     }
 
-    private long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
+    protected long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
         Map<String, String> offsetTokens =
                 this.getClient().getLatestCommittedOffsetTokens(List.of(this.getChannel()));
         Preconditions.checkState(
