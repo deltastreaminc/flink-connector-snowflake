@@ -29,7 +29,6 @@ import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContex
 import io.deltastream.flink.connector.snowflake.sink.internal.SnowflakeSinkService;
 import io.deltastream.flink.connector.snowflake.sink.internal.SnowflakeSinkServiceImpl;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
-import net.snowflake.ingest.utils.SFException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,11 +113,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
          * Send to the service for eventual write
          * This may flush based on SnowflakeSinkService.SnowflakeWriterConfig
          */
-        try {
-            this.sinkService.insert(this.serializationSchema.serialize(element, sinkContext));
-        } catch (SFException e) {
-            throw new IOException("Failed to insert row with Snowflake sink service", e);
-        }
+        this.sinkService.insert(this.serializationSchema.serialize(element, sinkContext));
     }
 
     @Override
