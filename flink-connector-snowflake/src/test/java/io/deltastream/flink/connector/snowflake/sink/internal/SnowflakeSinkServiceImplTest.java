@@ -9,6 +9,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.metrics.groups.OperatorIOMetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
@@ -24,6 +25,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -119,6 +122,50 @@ class SnowflakeSinkServiceImplTest {
                 e.getMessage()
                         .contains(
                                 "Encountered errors while ingesting rows into Snowflake: Ingest client internal error: test."));
+    }
+
+    @Test
+    void testFetchOffsetTokenErrorHandling() {
+        FlinkRuntimeException e =
+                Assertions.assertThrows(
+                        FlinkRuntimeException.class,
+                        () ->
+                                new FakeSnowflakeSinkServiceImpl(
+                                        "appId",
+                                        0,
+                                        new Properties(),
+                                        SnowflakeWriterConfig.builder().build(),
+                                        SnowflakeChannelConfig.builder()
+                                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                                        new FakeSinkWriterMetricGroup()) {
+                                    @Override
+                                    public SnowflakeStreamingIngestClient getClient() {
+                                        return new FakeSnowflakeStreamingIngestClient(
+                                                this.getChannelName()) {
+                                            @Override
+                                            public Map<String, String>
+                                                    getLatestCommittedOffsetTokens(
+                                                            List<SnowflakeStreamingIngestChannel>
+                                                                    channels) {
+                                                Map<String, String> offsetTokens = new HashMap<>();
+                                                channels.forEach(
+                                                        c -> {
+                                                            String fqn = c.getFullyQualifiedName();
+                                                            String token = "invalid_token";
+                                                            offsetTokens.put(fqn, token);
+                                                        });
+                                                return offsetTokens;
+                                            }
+                                        };
+                                    }
+                                });
+        Assertions.assertTrue(
+                e.getMessage()
+                        .contains(
+                                String.format(
+                                        "The offsetToken '%s' cannot be parsed as a long for channel",
+                                        "invalid_token")));
+        Assertions.assertTrue(e.getCause() instanceof NumberFormatException);
     }
 
     private class FakeSnowflakeSinkServiceImpl extends SnowflakeSinkServiceImpl {

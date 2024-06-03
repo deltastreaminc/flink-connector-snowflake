@@ -58,10 +58,7 @@ public class FakeSnowflakeStreamingIngestClient implements SnowflakeStreamingIng
         channels.forEach(
                 c -> {
                     String fqn = c.getFullyQualifiedName();
-                    String token =
-                            channelCache
-                                    .get(c.getFullyQualifiedName())
-                                    .getLatestCommittedOffsetToken();
+                    String token = channelCache.get(fqn).getLatestCommittedOffsetToken();
                     offsetTokens.put(fqn, token);
                 });
         return offsetTokens;

@@ -35,6 +35,7 @@ import net.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
 import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import net.snowflake.ingest.utils.SFException;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +128,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 this.getChannelName(),
                 this.getClient().getName());
         this.channel = Preconditions.checkNotNull(this.openChannelFromConfig());
-        this.offset = getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        this.offset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
 
         // metrics counters
         final SinkWriterMetricGroup sinkMetricGroup =
@@ -198,6 +199,13 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                             flushRes.getClass().getSimpleName()));
         }
 
+        /*
+         * After flush has completed, wait until the Snowflake ingest channel offset matches the expected
+         * number of records we have just flushed. In this code block, we retry infinitely (with 1 second
+         * sleep between tries). If the offset on the channel never catches up to our expected offset,
+         * the Flink job will eventually abort the checkpoint after the checkpoint timeout duration has
+         * expired.
+         */
         while (this.getLatestCommittedOffsetFromSnowflakeIngestChannel() < this.offset) {
             try {
                 LOGGER.info(
@@ -303,13 +311,13 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         offsetTokens.size()));
         String offsetToken = offsetTokens.get(offsetTokens.keySet().iterator().next());
         try {
-            return ObjectUtils.isEmpty(offsetToken) ? 0 : Long.parseLong(offsetToken);
+            return StringUtils.isEmpty(offsetToken) ? 0 : Long.parseLong(offsetToken);
         } catch (NumberFormatException e) {
-            LOGGER.error(
-                    "The offsetToken string does not contain a parsable long:{} for channel:{}",
-                    offsetToken,
-                    this.getChannelName());
-            throw e;
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The offsetToken '%s' cannot be parsed as a long for channel '%s'",
+                            offsetToken, this.getChannelName()),
+                    e);
         }
     }
 
