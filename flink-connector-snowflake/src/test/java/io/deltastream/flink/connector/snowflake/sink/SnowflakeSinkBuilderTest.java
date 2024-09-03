@@ -93,4 +93,27 @@ class SnowflakeSinkBuilderTest {
                                 SnowflakeSinkBuilder.SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME,
                                 SnowflakeSinkBuilder.SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME));
     }
+
+    @Test
+    public void testFailureOnMissingPrivateKeyWithEmptyPassphrase() {
+        final SnowflakeSinkBuilder<Map<String, Object>> bSink =
+                SnowflakeSink.<Map<String, Object>>builder()
+                        .url("test-url")
+                        .user("test-user")
+                        .role("test-role")
+                        .database("test_db")
+                        .schema("test_schema")
+                        .table("test_table")
+                        .privateKey("some-priv-key")
+                        .keyPassphrase("")
+                        .serializationSchema(
+                                ((SnowflakeRowSerializationSchema<Map<String, Object>>)
+                                        (element, sinkContext) -> element));
+
+        final SnowflakeSink<Map<String, Object>> sink = bSink.build("passphrase-test");
+        Assertions.assertThat(
+                        sink.getConnectionConfigs()
+                                .get(SnowflakeSinkBuilder.SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME))
+                .isEqualTo("");
+    }
 }
