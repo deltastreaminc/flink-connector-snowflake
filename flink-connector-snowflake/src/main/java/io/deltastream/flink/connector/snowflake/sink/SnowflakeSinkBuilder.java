@@ -132,7 +132,7 @@ public class SnowflakeSinkBuilder<IN> {
      */
     public SnowflakeSinkBuilder<IN> keyPassphrase(final String connectionKeyPassphrase) {
         Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(connectionKeyPassphrase),
+                connectionKeyPassphrase != null,
                 String.format("Invalid %s", SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME));
         this.connectionProps.put(SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME, connectionKeyPassphrase);
         return this;

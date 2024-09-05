@@ -75,7 +75,7 @@ The following credentials are used in the tests for integrating with the Snowfla
 * `SNOWFLAKE_USER`: Username to write data as
 * `SNOWFLAKE_ROLE`: Database role to write data as
 * `SNOWFLAKE_PRIVATE_KEY`: User's private key to use for connecting to the service
-* `SNOWFLAKE_KEY_PASSPHRASE`: User's private key password to use for connecting to the service
+* `SNOWFLAKE_KEY_PASSPHRASE`: User's private key password to use for connecting to the service, as supported by OpenSSL guidelines
 
 ### Integration Test
 
