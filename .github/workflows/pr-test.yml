@@ -35,8 +35,8 @@ jobs:
 
     - name: Create version name
       run: |
-        if [ "${{ matrix.java-version }}" != "17" ]; then
-          echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}-${{ matrix.java-version }}" >> $GITHUB_ENV
+        if [ "${{ matrix.java }}" != "17" ]; then
+          echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}-${{ matrix.java }}" >> $GITHUB_ENV
         else
           echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
 
