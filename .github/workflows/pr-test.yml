@@ -15,6 +15,7 @@ jobs:
     strategy:
       matrix:
         java:
+          - 11
           - 17
     permissions:
       contents: read
@@ -32,10 +33,17 @@ jobs:
         java-version: ${{ matrix.java }}
         distribution: 'temurin'
 
+    - name: Create version name
+      run: |
+        if [ "${{ matrix.java-version }}" != "17" ]; then
+          echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}-${{ matrix.java-version }}" >> $GITHUB_ENV
+        else
+          echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+
     - name: Test and Build Artifact
       id: build
       run: |
         mvn package \
-          -Drevision=${{ github.event.pull_request.head.sha }} \
+          -Drevision=${{ env.VERSION_NAME }} \
           -U -B -ff -fae \
           -f pom.xml
