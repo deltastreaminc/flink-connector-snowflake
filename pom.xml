@@ -56,6 +56,8 @@
 		<!-- Java versions -->
 		<java.version>17</java.version>
 		<maven.compiler.release>${java.version}</maven.compiler.release>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<target.java.version>${java.version}</target.java.version>
 
 		<flink.version>1.18.0</flink.version>
