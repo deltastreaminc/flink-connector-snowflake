@@ -43,6 +43,7 @@ jobs:
           echo "VERSION_NAME=${{ github.event.release.tag_name }}-j${{ matrix.java }}" >> $GITHUB_ENV
         else
           echo "VERSION_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+        fi
 
     - name: Build and Release Artifact
       id: release-jar
