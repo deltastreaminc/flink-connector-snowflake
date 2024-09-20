@@ -39,6 +39,7 @@ jobs:
           echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}-j${{ matrix.java }}" >> $GITHUB_ENV
         else
           echo "VERSION_NAME=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+        fi
 
     - name: Test and Build Artifact
       id: build
