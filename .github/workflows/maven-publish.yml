@@ -51,6 +51,7 @@ jobs:
         cd flink-connector-snowflake && \
           mvn deploy -P docs-and-source,release \
             -Drevision=${{ env.VERSION_NAME }} \
+            -Djava.version=${{ matrix.java }} \
             -U -B -ff -fae \
             -s $GITHUB_WORKSPACE/settings.xml \
             -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }} \
