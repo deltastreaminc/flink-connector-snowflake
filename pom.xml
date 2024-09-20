@@ -404,7 +404,8 @@
 									<version>[3.2.5,)</version>
 								</requireMavenVersion>
 								<requireJavaVersion>
-									<version>17</version>
+									<!-- java version must be what's set for the build environment -->
+									<version>${java.version}</version>
 								</requireJavaVersion>
 							</rules>
 						</configuration>
