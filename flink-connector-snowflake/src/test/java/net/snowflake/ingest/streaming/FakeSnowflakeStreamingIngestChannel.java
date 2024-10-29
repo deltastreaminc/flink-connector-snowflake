@@ -1,7 +1,8 @@
 package net.snowflake.ingest.streaming;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+
 import net.snowflake.ingest.streaming.internal.ColumnProperties;
-import org.testcontainers.shaded.com.google.common.collect.Lists;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
