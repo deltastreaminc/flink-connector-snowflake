@@ -15,7 +15,7 @@ Prerequisites:
 * Unix-like environment (we use Linux, Mac OS X)
 * Git
 * Maven (we recommend version 3.8.6)
-* Java 11
+* Java 17
 
 ```
 git clone https://github.com/deltastreaminc/flink-connector-snowflake.git
