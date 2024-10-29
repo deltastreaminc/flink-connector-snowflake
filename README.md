@@ -59,6 +59,17 @@ class test {
 }
 ```
 
+where:
+
+* `url` is the account URL given by Snowflake, e.g. `https://<account-id>.snowflakecomputing.com`.
+* `user` is the username to use to connect to the Snowflake account.
+* `role` is the role with access to the table within the Snowflake account.
+* `bufferTimeMillis` is the time in milliseconds to buffer records before writing them to Snowflake. _NOTE: The buffer is also flushed when a checkpoint is triggered or the job is stopped._ See [Checkpointing with Flink](#checkpointing-with-flink).
+* `database` is the database name within the Snowflake account. See note below about case sensitivity.
+* `schema` is the schema name within the Snowflake account. See note below about case sensitivity.
+* `table` is the table name within the Snowflake account. See note below about case sensitivity.
+* `serializationSchema` is the serialization schema implementation of `SnowflakeRowSerializationSchema` to use to convert records to Snowflake rows.
+
 In Snowflake, the full name of a table is case-insensitive, but UPPER_CASE biased. In other words, a sink configured with a fully qualified name of `DB.SCHEMA.table` is treated as `DB.SCHEMA.TABLE`. To be able to use case-sensitive name parts, add double quotes around them to be treated as the literal name, e.g. `DB.SCHEMA."table"`.
 
 ## Checkpointing with Flink
