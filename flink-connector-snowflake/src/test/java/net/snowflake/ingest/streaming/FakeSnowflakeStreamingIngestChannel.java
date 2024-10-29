@@ -82,6 +82,11 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
 
     @Override
     public CompletableFuture<Void> close() {
+        return this.close(false);
+    }
+
+    @Override
+    public CompletableFuture<Void> close(boolean b) {
         closed = true;
         return CompletableFuture.completedFuture(null);
     }
@@ -93,12 +98,20 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
 
     @Override
     public InsertValidationResponse insertRows(
-            Iterable<Map<String, Object>> rows, String offsetToken) {
+            Iterable<Map<String, Object>> iterable,
+            String startOffsetToken,
+            String endOffsetToken) {
         final List<Map<String, Object>> rowsCopy = new LinkedList<>();
         rows.forEach(r -> rowsCopy.add(new LinkedHashMap<>(r)));
         this.rows.addAll(rowsCopy);
-        this.offsetToken = offsetToken;
+        this.offsetToken = endOffsetToken;
         return new InsertValidationResponse();
+    }
+
+    @Override
+    public InsertValidationResponse insertRows(
+            Iterable<Map<String, Object>> rows, String offsetToken) {
+        return this.insertRows(rows, null, offsetToken);
     }
 
     @Override

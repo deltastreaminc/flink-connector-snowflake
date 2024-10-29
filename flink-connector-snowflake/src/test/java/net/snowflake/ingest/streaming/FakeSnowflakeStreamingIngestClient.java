@@ -39,6 +39,15 @@ public class FakeSnowflakeStreamingIngestClient implements SnowflakeStreamingIng
     }
 
     @Override
+    public void dropChannel(DropChannelRequest dropChannelRequest) {
+        channelCache.remove(
+                String.format(
+                        "%s.%s",
+                        dropChannelRequest.getFullyQualifiedTableName(),
+                        dropChannelRequest.getChannelName()));
+    }
+
+    @Override
     public String getName() {
         return name;
     }
