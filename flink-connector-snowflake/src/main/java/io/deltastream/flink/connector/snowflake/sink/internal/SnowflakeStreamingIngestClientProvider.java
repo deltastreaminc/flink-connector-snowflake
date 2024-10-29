@@ -87,7 +87,7 @@ public class SnowflakeStreamingIngestClientProvider {
         Preconditions.checkNotNull(writerConfig, "writerConfig");
         return Maps.newHashMap(
                 Map.of(
-                        ParameterProvider.BUFFER_FLUSH_INTERVAL_IN_MILLIS, // buffer time
+                        ParameterProvider.MAX_CLIENT_LAG, // buffer time
                         writerConfig.getMaxBufferTimeMs(),
                         ParameterProvider
                                 .ENABLE_SNOWPIPE_STREAMING_METRICS, // snowpipe streaming metrics
