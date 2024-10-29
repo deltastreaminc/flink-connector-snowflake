@@ -6,14 +6,15 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
+
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.shaded.com.google.common.collect.Maps;
-import org.testcontainers.shaded.org.apache.commons.lang3.StringUtils;
-import org.testcontainers.shaded.org.apache.commons.lang3.SystemUtils;
 
 import java.util.Map;
 import java.util.UUID;

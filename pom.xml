@@ -60,12 +60,11 @@
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<target.java.version>${java.version}</target.java.version>
 
-		<flink.version>1.18.0</flink.version>
+		<flink.version>1.19.1</flink.version>
 		<kryo.version>2.24.0</kryo.version>
 		<objenesis.version>2.1</objenesis.version>
 
 		<snowflake-ingest.version>2.0.4</snowflake-ingest.version>
-		<failsafe.version>3.3.2</failsafe.version>
 		<assertj.version>3.21.0</assertj.version>
 		<junit5.version>5.10.0</junit5.version>
 		<testcontainers.version>1.19.1</testcontainers.version>
@@ -174,12 +173,6 @@
 				<groupId>net.snowflake</groupId>
 				<artifactId>snowflake-ingest-sdk</artifactId>
 				<version>${snowflake-ingest.version}</version>
-			</dependency>
-
-			<dependency>
-				<groupId>dev.failsafe</groupId>
-				<artifactId>failsafe</artifactId>
-				<version>${failsafe.version}</version>
 			</dependency>
 
 			<!-- Flink dependencies -->
