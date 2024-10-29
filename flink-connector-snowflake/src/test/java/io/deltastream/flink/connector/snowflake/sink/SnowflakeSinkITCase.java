@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.io.Serial;
 import java.util.Map;
 import java.util.UUID;
 
@@ -86,7 +85,7 @@ class SnowflakeSinkITCase {
 
     private static class SfRowMapFunction implements MapFunction<Long, Map<String, Object>> {
 
-        @Serial private static final long serialVersionUID = -2836417330784371895L;
+        private static final long serialVersionUID = -2836417330784371895L;
 
         @Override
         public Map<String, Object> map(Long id) {
@@ -103,7 +102,7 @@ class SnowflakeSinkITCase {
     private static class RowPassThroughSerializer
             implements SnowflakeRowSerializationSchema<Map<String, Object>> {
 
-        @Serial private static final long serialVersionUID = -23875899103249615L;
+        private static final long serialVersionUID = -23875899103249615L;
 
         @Override
         public Map<String, Object> serialize(
