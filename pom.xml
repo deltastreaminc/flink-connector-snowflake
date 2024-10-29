@@ -60,7 +60,7 @@
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<target.java.version>${java.version}</target.java.version>
 
-		<flink.version>1.18.0</flink.version>
+		<flink.version>1.19.1</flink.version>
 		<kryo.version>2.24.0</kryo.version>
 		<objenesis.version>2.1</objenesis.version>
 
