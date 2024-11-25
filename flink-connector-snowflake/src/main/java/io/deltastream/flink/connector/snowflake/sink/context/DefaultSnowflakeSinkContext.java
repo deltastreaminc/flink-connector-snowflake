@@ -18,7 +18,7 @@
 package io.deltastream.flink.connector.snowflake.sink.context;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
@@ -30,13 +30,13 @@ import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfi
 @Internal
 public class DefaultSnowflakeSinkContext implements SnowflakeSinkContext {
 
-    private final Sink.InitContext initContext;
+    private final WriterInitContext initContext;
     private final boolean flushOnCheckpoint;
     private final SnowflakeWriterConfig writerConfig;
     private final String appId;
 
     public DefaultSnowflakeSinkContext(
-            Sink.InitContext initContext, SnowflakeWriterConfig writerConfig, String appId) {
+            WriterInitContext initContext, SnowflakeWriterConfig writerConfig, String appId) {
         this.initContext = initContext;
         this.writerConfig = writerConfig;
         this.flushOnCheckpoint =
@@ -45,7 +45,7 @@ public class DefaultSnowflakeSinkContext implements SnowflakeSinkContext {
     }
 
     @Override
-    public Sink.InitContext getInitContext() {
+    public WriterInitContext getInitContext() {
         return this.initContext;
     }
 
