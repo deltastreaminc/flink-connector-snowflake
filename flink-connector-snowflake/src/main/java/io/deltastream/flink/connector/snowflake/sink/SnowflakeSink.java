@@ -20,6 +20,7 @@ package io.deltastream.flink.connector.snowflake.sink;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
@@ -102,8 +103,12 @@ public class SnowflakeSink<IN> implements Sink<IN> {
         return new SnowflakeSinkBuilder<>();
     }
 
-    @Override
     public SinkWriter<IN> createWriter(InitContext initContext) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    @Override
+    public SinkWriter<IN> createWriter(WriterInitContext initContext) {
         return new SnowflakeSinkWriter<>(
                 new DefaultSnowflakeSinkContext(
                         Preconditions.checkNotNull(initContext, "initContext"),

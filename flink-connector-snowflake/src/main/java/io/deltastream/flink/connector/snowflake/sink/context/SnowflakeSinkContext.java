@@ -18,7 +18,7 @@
 package io.deltastream.flink.connector.snowflake.sink.context;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 
@@ -30,7 +30,7 @@ import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfi
 public interface SnowflakeSinkContext {
 
     /** Get the current init context in sink. */
-    Sink.InitContext getInitContext();
+    WriterInitContext getInitContext();
 
     /** Get the current process time in Flink. */
     long processTime();
