@@ -44,7 +44,7 @@ This change added tests and can be verified as describe. Please describe the int
 
 In all cases, ensure that at least a simple integration test with a Snowflake account successfully runs.
 
-## Does this pull request potentially affect one of the following parts:
+## Does this pull request potentially affect one of the following parts
 
 - Dependencies (does it add or upgrade a dependency): (yes / no)
 - The public API, i.e., is any changed class annotated with `@Public(Evolving)`: (yes / no)
