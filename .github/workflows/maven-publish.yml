@@ -13,6 +13,7 @@ jobs:
         java:
           - 11
           - 17
+          - 21
     permissions:
       contents: read
       packages: write
@@ -37,20 +38,12 @@ jobs:
       run:
         cat <(echo -e "${{ secrets.OSSRH_GPG_SECRET_KEY }}") | gpg --batch --import
 
-    - name: Create version name
-      run: |
-        if [ "${{ matrix.java }}" != "17" ]; then
-          echo "VERSION_NAME=${{ github.event.release.tag_name }}-j${{ matrix.java }}" >> $GITHUB_ENV
-        else
-          echo "VERSION_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-        fi
-
     - name: Build and Release Artifact
       id: release-jar
       run: |
         cd flink-connector-snowflake && \
           mvn deploy -P docs-and-source,release \
-            -Drevision=${{ env.VERSION_NAME }} \
+            -Drevision=${{ github.event.release.tag_name }} \
             -Djava.version=${{ matrix.java }} \
             -U -B -ff -fae \
             -s $GITHUB_WORKSPACE/settings.xml \
