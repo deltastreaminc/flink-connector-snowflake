@@ -1,12 +1,13 @@
 package io.deltastream.flink.connector.snowflake.sink;
 
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
+import org.apache.flink.shaded.guava32.com.google.common.collect.Maps;
 
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
@@ -75,9 +76,15 @@ class SnowflakeSinkITCase {
 
         final SnowflakeSink<Map<String, Object>> sink = sinkBuilder.build("sf_sink_job");
 
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        final StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(
+                        Configuration.fromMap(
+                                Map.of(
+                                        RestartStrategyOptions.RESTART_STRATEGY.key(),
+                                        RestartStrategyOptions.RestartStrategyType
+                                                .NO_RESTART_STRATEGY
+                                                .getMainValue())));
         env.enableCheckpointing(100L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
         env.setParallelism(1);
         env.fromSequence(1, 10).map(new SfRowMapFunction()).sinkTo(sink);
         env.execute();

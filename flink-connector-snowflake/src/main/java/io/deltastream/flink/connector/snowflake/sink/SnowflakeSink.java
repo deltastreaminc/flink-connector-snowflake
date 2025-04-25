@@ -103,10 +103,6 @@ public class SnowflakeSink<IN> implements Sink<IN> {
         return new SnowflakeSinkBuilder<>();
     }
 
-    public SinkWriter<IN> createWriter(InitContext initContext) {
-        throw new UnsupportedOperationException("Not supported");
-    }
-
     @Override
     public SinkWriter<IN> createWriter(WriterInitContext initContext) {
         return new SnowflakeSinkWriter<>(

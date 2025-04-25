@@ -33,8 +33,8 @@ import java.util.Properties;
 class SnowflakeSinkServiceImplTest {
 
     @Test
-    void testSuccessfulInsert() throws IOException {
-        SnowflakeSinkServiceImpl sinkService =
+    void testSuccessfulInsert() throws Exception {
+        try (SnowflakeSinkServiceImpl sinkService =
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
@@ -42,17 +42,18 @@ class SnowflakeSinkServiceImplTest {
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
-                        new FakeSinkWriterMetricGroup());
-        Assertions.assertEquals(
-                0, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
-        sinkService.insert(Map.of("field_1", "val_1"));
-        Assertions.assertEquals(
-                1, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
+                        new FakeSinkWriterMetricGroup())) {
+            Assertions.assertEquals(
+                    0, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
+            sinkService.insert(Map.of("field_1", "val_1"));
+            Assertions.assertEquals(
+                    1, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
+        }
     }
 
     @Test
-    void testInsertExceptionHandling() throws IOException {
-        SnowflakeSinkServiceImpl sinkService =
+    void testInsertExceptionHandling() throws Exception {
+        try (SnowflakeSinkServiceImpl sinkService =
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
@@ -75,17 +76,19 @@ class SnowflakeSinkServiceImplTest {
                             }
                         };
                     }
-                };
-        IOException e =
-                Assertions.assertThrows(
-                        IOException.class, () -> sinkService.insert(Map.of("field_1", "val_1")));
-        Assertions.assertTrue(
-                e.getMessage().contains("Failed to insert row with Snowflake sink service"));
+                }) {
+            IOException e =
+                    Assertions.assertThrows(
+                            IOException.class,
+                            () -> sinkService.insert(Map.of("field_1", "val_1")));
+            Assertions.assertTrue(
+                    e.getMessage().contains("Failed to insert row with Snowflake sink service"));
+        }
     }
 
     @Test
-    void testInsertErrornHandling() throws IOException {
-        SnowflakeSinkServiceImpl sinkService =
+    void testInsertErrornHandling() throws Exception {
+        try (SnowflakeSinkServiceImpl sinkService =
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
@@ -114,14 +117,16 @@ class SnowflakeSinkServiceImplTest {
                             }
                         };
                     }
-                };
-        IOException e =
-                Assertions.assertThrows(
-                        IOException.class, () -> sinkService.insert(Map.of("field_1", "val_1")));
-        Assertions.assertTrue(
-                e.getMessage()
-                        .contains(
-                                "Encountered errors while ingesting rows into Snowflake: Ingest client internal error: test."));
+                }) {
+            IOException e =
+                    Assertions.assertThrows(
+                            IOException.class,
+                            () -> sinkService.insert(Map.of("field_1", "val_1")));
+            Assertions.assertTrue(
+                    e.getMessage()
+                            .contains(
+                                    "Encountered errors while ingesting rows into Snowflake: Ingest client internal error: test."));
+        }
     }
 
     @Test
@@ -168,7 +173,7 @@ class SnowflakeSinkServiceImplTest {
         Assertions.assertTrue(e.getCause() instanceof NumberFormatException);
     }
 
-    private class FakeSnowflakeSinkServiceImpl extends SnowflakeSinkServiceImpl {
+    private static class FakeSnowflakeSinkServiceImpl extends SnowflakeSinkServiceImpl {
 
         /**
          * Construct a new sink service to provide APIs to the Snowflake service.
@@ -197,7 +202,7 @@ class SnowflakeSinkServiceImplTest {
         }
     }
 
-    private class FakeSinkWriterMetricGroup implements SinkWriterMetricGroup {
+    private static class FakeSinkWriterMetricGroup implements SinkWriterMetricGroup {
 
         @Override
         public Counter getNumRecordsOutErrorsCounter() {

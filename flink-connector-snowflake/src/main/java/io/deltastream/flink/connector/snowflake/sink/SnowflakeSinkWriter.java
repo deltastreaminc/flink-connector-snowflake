@@ -85,7 +85,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
             this.sinkService =
                     new SnowflakeSinkServiceImpl(
                             this.sinkContext.getAppId(),
-                            this.sinkContext.getInitContext().getSubtaskId(),
+                            this.sinkContext.getInitContext().getTaskInfo().getIndexOfThisSubtask(),
                             connectionConfigs,
                             this.sinkContext.getWriterConfig(),
                             channelConfig,
@@ -107,7 +107,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     }
 
     @Override
-    public void write(IN element, Context context) throws IOException, InterruptedException {
+    public void write(IN element, Context context) throws IOException {
 
         /*
          * Send to the service for eventual write

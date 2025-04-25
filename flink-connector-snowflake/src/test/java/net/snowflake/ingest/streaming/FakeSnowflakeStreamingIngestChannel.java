@@ -1,6 +1,6 @@
 package net.snowflake.ingest.streaming;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava32.com.google.common.collect.Lists;
 
 import net.snowflake.ingest.streaming.internal.ColumnProperties;
 
