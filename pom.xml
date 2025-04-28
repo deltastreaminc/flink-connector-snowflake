@@ -25,7 +25,7 @@
 	<parent>
 		<groupId>org.apache.flink</groupId>
 		<artifactId>flink-connector-parent</artifactId>
-		<version>1.0.0</version>
+		<version>1.1.0</version>
 	</parent>
 
 	<groupId>io.deltastream</groupId>
@@ -73,6 +73,8 @@
 
 		<japicmp.skip>false</japicmp.skip>
 		<japicmp.referenceVersion>3.0.0-1.16</japicmp.referenceVersion>
+		<checkstyle.version>10.18.2</checkstyle.version>
+		<spotless.skip>false</spotless.skip>
 
 		<slf4j.version>1.7.36</slf4j.version>
 		<log4j.version>2.17.2</log4j.version>
@@ -81,7 +83,7 @@
 		<checksum-maven-plugin.version>1.11</checksum-maven-plugin.version>
 		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
 		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
-		<maven-shade-plugin.version>3.3.0</maven-shade-plugin.version>
+		<spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
 
 	</properties>
 
@@ -362,12 +364,28 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>3.5.0</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<!-- Note: match version with docs/flinkDev/ide_setup.md -->
+						<version>${checkstyle.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 			<plugin>
 				<groupId>com.diffplug.spotless</groupId>
 				<artifactId>spotless-maven-plugin</artifactId>
+				<version>${spotless-maven-plugin.version}</version>
 				<configuration>
-					<skip>false</skip>
+					<skip>${spotless.skip}</skip>
+					<java>
+						<googleJavaFormat>
+							<version>1.24.0</version>
+							<style>AOSP</style>
+						</googleJavaFormat>
+					</java>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -400,12 +418,11 @@
 						<configuration>
 							<rules>
 								<requireMavenVersion>
-									<!-- maven version must be at least 3.2.5 -->
-									<version>[3.2.5,)</version>
+									<version>[3.8.6,)</version>
 								</requireMavenVersion>
 								<requireJavaVersion>
 									<!-- java version must be what's set for the build environment -->
-									<version>${java.version}</version>
+									<version>[11,)</version>
 								</requireJavaVersion>
 							</rules>
 						</configuration>
