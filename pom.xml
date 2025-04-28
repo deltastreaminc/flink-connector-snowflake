@@ -60,25 +60,25 @@
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<target.java.version>${java.version}</target.java.version>
 
-		<flink.version>1.20.0</flink.version>
-		<kryo.version>2.24.0</kryo.version>
-		<objenesis.version>2.1</objenesis.version>
+		<!-- Flink dependencies -->
+		<flink.version>2.0.0</flink.version>
+		<kryo.version>5.6.2</kryo.version>
+		<objenesis.version>3.3</objenesis.version>
+		<slf4j.version>1.7.36</slf4j.version>
+		<log4j.version>2.24.1</log4j.version>
+		<jsr305.version>1.3.9</jsr305.version>
 
 		<snowflake-ingest.version>2.3.0</snowflake-ingest.version>
-		<assertj.version>3.21.0</assertj.version>
-		<junit5.version>5.10.0</junit5.version>
-		<testcontainers.version>1.19.1</testcontainers.version>
-		<mockito.version>5.2.0</mockito.version>
+		<junit5.version>5.12.2</junit5.version>
+		<testcontainers.version>1.21.0</testcontainers.version>
+		<mockito.version>5.17.0</mockito.version>
 		<jackson-bom.version>2.15.3</jackson-bom.version>
+		<guava.version>32.1.3-jre-19.0</guava.version>
 
 		<japicmp.skip>false</japicmp.skip>
 		<japicmp.referenceVersion>3.0.0-1.16</japicmp.referenceVersion>
 		<checkstyle.version>10.18.2</checkstyle.version>
 		<spotless.skip>false</spotless.skip>
-
-		<slf4j.version>1.7.36</slf4j.version>
-		<log4j.version>2.17.2</log4j.version>
-		<jsr305.version>1.3.9</jsr305.version>
 
 		<checksum-maven-plugin.version>1.11</checksum-maven-plugin.version>
 		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
@@ -108,25 +108,13 @@
 			<scope>provided</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-shaded-guava</artifactId>
+			<version>${guava.version}</version>
+		</dependency>
+
 		<!-- Test dependencies -->
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.assertj</groupId>
-			<artifactId>assertj-core</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-inline</artifactId>
-			<type>jar</type>
-			<scope>test</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>org.mockito</groupId>
@@ -244,30 +232,15 @@
 
 			<dependency>
 				<groupId>org.mockito</groupId>
-				<artifactId>mockito-inline</artifactId>
-				<version>${mockito.version}</version>
-				<type>jar</type>
-				<scope>test</scope>
-			</dependency>
-
-			<dependency>
-				<groupId>org.mockito</groupId>
 				<artifactId>mockito-core</artifactId>
 				<version>${mockito.version}</version>
 				<type>jar</type>
 				<scope>test</scope>
 			</dependency>
 
-			<dependency>
-				<groupId>org.assertj</groupId>
-				<artifactId>assertj-core</artifactId>
-				<version>${assertj.version}</version>
-				<scope>test</scope>
-			</dependency>
-
 			<!-- For dependency convergence -->
 			<dependency>
-				<groupId>com.esotericsoftware.kryo</groupId>
+				<groupId>com.esotericsoftware</groupId>
 				<artifactId>kryo</artifactId>
 				<version>${kryo.version}</version>
 			</dependency>
