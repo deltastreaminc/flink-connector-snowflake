@@ -17,8 +17,8 @@
 
 package io.deltastream.flink.connector.snowflake.sink.internal;
 
-import org.apache.flink.shaded.guava32.com.google.common.base.Joiner;
-import org.apache.flink.shaded.guava32.com.google.common.base.Preconditions;
+import org.apache.flink.shaded.guava33.com.google.common.base.Joiner;
+import org.apache.flink.shaded.guava33.com.google.common.base.Preconditions;
 
 import org.apache.commons.lang3.StringUtils;
 
