@@ -76,7 +76,6 @@
 		<guava.version>33.4.0-jre-20.0</guava.version>
 
 		<japicmp.skip>false</japicmp.skip>
-		<japicmp.referenceVersion>3.0.0-1.16</japicmp.referenceVersion>
 		<checkstyle.version>10.18.2</checkstyle.version>
 		<spotless.skip>false</spotless.skip>
 
