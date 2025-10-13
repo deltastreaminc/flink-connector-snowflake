@@ -20,7 +20,7 @@ package io.deltastream.flink.connector.snowflake.sink.internal;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava32.com.google.common.collect.Maps;
+import org.apache.flink.shaded.guava33.com.google.common.collect.Maps;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
