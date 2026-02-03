@@ -89,6 +89,10 @@ public class SnowflakeStreamingIngestClientProvider {
                 Map.of(
                         ParameterProvider.MAX_CLIENT_LAG, // buffer time
                         writerConfig.getMaxBufferTimeMs(),
+                        ParameterProvider.MAX_MEMORY_LIMIT_IN_BYTES,
+                        1024 * 1024 * 256L, // max memory limit 256MB
+                        ParameterProvider.MAX_CHANNEL_SIZE_IN_BYTES,
+                        1024 * 1024 * 10L, // max channel size 10MB
                         ParameterProvider
                                 .ENABLE_SNOWPIPE_STREAMING_METRICS, // snowpipe streaming metrics
                         true));
