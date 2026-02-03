@@ -28,7 +28,7 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
     private boolean closed;
     private String offsetToken;
 
-    private List<Map<String, Object>> rows = new LinkedList<>();
+    private final List<Map<String, Object>> rows = new LinkedList<>();
 
     public FakeSnowflakeStreamingIngestChannel(
             String name, String dbName, String schemaName, String tableName) {
@@ -117,6 +117,17 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
     @Override
     public String getLatestCommittedOffsetToken() {
         return offsetToken;
+    }
+
+    /**
+     * Flush the channel, returning a CompletableFuture that completes immediately. This simulates
+     * the async flush operation.
+     *
+     * @param ignored whether this is a closing flush
+     * @return a completed CompletableFuture
+     */
+    public CompletableFuture<Void> flush(boolean ignored) {
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

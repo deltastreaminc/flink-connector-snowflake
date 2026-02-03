@@ -131,6 +131,7 @@ class SnowflakeSinkServiceImplTest {
 
     @Test
     void testFetchOffsetTokenErrorHandling() {
+        @SuppressWarnings("resource")
         FlinkRuntimeException e =
                 Assertions.assertThrows(
                         FlinkRuntimeException.class,
@@ -170,7 +171,7 @@ class SnowflakeSinkServiceImplTest {
                                 String.format(
                                         "The offsetToken '%s' cannot be parsed as a long for channel",
                                         "invalid_token")));
-        Assertions.assertTrue(e.getCause() instanceof NumberFormatException);
+        Assertions.assertInstanceOf(NumberFormatException.class, e.getCause());
     }
 
     @Test
@@ -280,6 +281,196 @@ class SnowflakeSinkServiceImplTest {
         }
     }
 
+    @Test
+    void testFlushWithOffsetAlignment() throws Exception {
+        // Test that flush waits for offset alignment
+        try (SnowflakeSinkServiceImpl sinkService =
+                new FakeSnowflakeSinkServiceImpl(
+                        "appId",
+                        0,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                        new FakeSinkWriterMetricGroup())) {
+
+            // Insert some records
+            sinkService.insert(Map.of("field_1", "val_1"));
+            sinkService.insert(Map.of("field_2", "val_2"));
+            sinkService.insert(Map.of("field_3", "val_3"));
+
+            // Flush should wait for committed offset to align
+            sinkService.flush();
+
+            // Verify offset is aligned after flush
+            Assertions.assertEquals(
+                    3,
+                    sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel(),
+                    "Committed offset should match inserted records after flush");
+        }
+    }
+
+    @Test
+    void testFlushWithDelayedOffsetCommit() throws Exception {
+        // Test that flush retries when offset commit is delayed
+        try (SnowflakeSinkServiceImpl sinkService =
+                new FakeSnowflakeSinkServiceImpl(
+                        "appId",
+                        0,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                        new FakeSinkWriterMetricGroup()) {
+
+                    private int offsetCheckCount = 0;
+
+                    @Override
+                    public SnowflakeStreamingIngestClient getClient() {
+                        return new FakeSnowflakeStreamingIngestClient(this.getChannelName()) {
+                            @Override
+                            public Map<String, String> getLatestCommittedOffsetTokens(
+                                    List<SnowflakeStreamingIngestChannel> channels) {
+                                offsetCheckCount++;
+                                Map<String, String> offsetTokens = new HashMap<>();
+                                channels.forEach(
+                                        c -> {
+                                            String fqn = c.getFullyQualifiedName();
+                                            // Simulate delayed commit: only return correct offset
+                                            // after 3 checks
+                                            String token =
+                                                    offsetCheckCount < 3
+                                                            ? "0"
+                                                            : c.getLatestCommittedOffsetToken();
+                                            offsetTokens.put(fqn, token);
+                                        });
+                                return offsetTokens;
+                            }
+                        };
+                    }
+                }) {
+
+            // Insert records
+            sinkService.insert(Map.of("field_1", "val_1"));
+            sinkService.insert(Map.of("field_2", "val_2"));
+
+            // Flush should retry and eventually succeed
+            sinkService.flush();
+
+            // Verify offset eventually aligned
+            Assertions.assertEquals(
+                    2,
+                    sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel(),
+                    "Committed offset should eventually align after retries");
+        }
+    }
+
+    @Test
+    void testChannelRecreationAfterThreshold() throws Exception {
+        // Test that channel is recreated after 1M inserts
+        final int threshold = 1_000_000;
+
+        try (TestableSnowflakeSinkServiceImpl sinkService =
+                new TestableSnowflakeSinkServiceImpl(
+                        "appId",
+                        0,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                        new FakeSinkWriterMetricGroup())) {
+
+            // Insert threshold number of records
+            for (int i = 0; i < threshold; i++) {
+                sinkService.insert(Map.of("field", "value_" + i));
+            }
+
+            // Flush should trigger channel recreation
+            sinkService.flush();
+
+            // Verify channel was recreated by checking the flag
+            Assertions.assertTrue(
+                    sinkService.wasChannelRecreated(),
+                    "Channel should be recreated after reaching threshold");
+        }
+    }
+
+    @Test
+    void testChannelNotRecreatedBelowThreshold() throws Exception {
+        // Test that channel is NOT recreated below 1M inserts
+        try (TestableSnowflakeSinkServiceImpl sinkService =
+                new TestableSnowflakeSinkServiceImpl(
+                        "appId",
+                        0,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                        new FakeSinkWriterMetricGroup())) {
+
+            // Insert well below threshold
+            for (int i = 0; i < 100; i++) {
+                sinkService.insert(Map.of("field", "value_" + i));
+            }
+
+            // Flush should NOT trigger channel recreation
+            sinkService.flush();
+
+            // Verify channel was not recreated
+            Assertions.assertFalse(
+                    sinkService.wasChannelRecreated(),
+                    "Channel should not be recreated below threshold");
+        }
+    }
+
+    @Test
+    void testRetryCountLogging() throws Exception {
+        // Test that retry attempts are properly tracked
+        final int[] callCount = {0};
+
+        try (SnowflakeSinkServiceImpl sinkService =
+                new FakeSnowflakeSinkServiceImpl(
+                        "appId",
+                        0,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
+                        new FakeSinkWriterMetricGroup()) {
+
+                    @Override
+                    public SnowflakeStreamingIngestClient getClient() {
+                        return new FakeSnowflakeStreamingIngestClient(this.getChannelName()) {
+                            @Override
+                            public Map<String, String> getLatestCommittedOffsetTokens(
+                                    List<SnowflakeStreamingIngestChannel> channels) {
+                                callCount[0]++;
+                                Map<String, String> offsetTokens = new HashMap<>();
+                                channels.forEach(
+                                        c -> {
+                                            String fqn = c.getFullyQualifiedName();
+                                            // Return correct offset after 5 retries
+                                            String token =
+                                                    callCount[0] <= 5
+                                                            ? "0"
+                                                            : c.getLatestCommittedOffsetToken();
+                                            offsetTokens.put(fqn, token);
+                                        });
+                                return offsetTokens;
+                            }
+                        };
+                    }
+                }) {
+
+            sinkService.insert(Map.of("field", "value"));
+            sinkService.flush();
+
+            // Verify that we actually did multiple retries (should be called during construction +
+            // retries + final check)
+            Assertions.assertTrue(callCount[0] > 5, "Should have made multiple retry attempts");
+        }
+    }
+
     private static class FakeSnowflakeSinkServiceImpl extends SnowflakeSinkServiceImpl {
 
         /**
@@ -306,6 +497,31 @@ class SnowflakeSinkServiceImplTest {
         SnowflakeStreamingIngestClient createClientFromConfig(
                 final String appId, final Properties connectionConfig) {
             return new FakeSnowflakeStreamingIngestClient(this.getChannelName());
+        }
+    }
+
+    /** Testable implementation that tracks channel recreation events. */
+    private static class TestableSnowflakeSinkServiceImpl extends FakeSnowflakeSinkServiceImpl {
+        private boolean channelRecreated = false;
+
+        public TestableSnowflakeSinkServiceImpl(
+                String appId,
+                int taskId,
+                Properties connectionConfig,
+                SnowflakeWriterConfig writerConfig,
+                SnowflakeChannelConfig channelConfig,
+                SinkWriterMetricGroup metricGroup) {
+            super(appId, taskId, connectionConfig, writerConfig, channelConfig, metricGroup);
+        }
+
+        @Override
+        void recreateChannel() {
+            super.recreateChannel();
+            channelRecreated = true;
+        }
+
+        public boolean wasChannelRecreated() {
+            return channelRecreated;
         }
     }
 
