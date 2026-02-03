@@ -173,6 +173,113 @@ class SnowflakeSinkServiceImplTest {
         Assertions.assertTrue(e.getCause() instanceof NumberFormatException);
     }
 
+    @Test
+    void testChannelNameIncludesTableInformation() {
+        // Test that channel name includes database, schema, and table name in the prefix
+        try (SnowflakeSinkServiceImpl sinkService =
+                new FakeSnowflakeSinkServiceImpl(
+                        "testAppId",
+                        5,
+                        new Properties(),
+                        SnowflakeWriterConfig.builder().build(),
+                        SnowflakeChannelConfig.builder()
+                                .build("TEST_DB", "TEST_SCHEMA", "TEST_TABLE"),
+                        new FakeSinkWriterMetricGroup())) {
+            String channelName = sinkService.getChannelName();
+
+            // Verify that the channel name contains the database, schema, and table information
+            Assertions.assertTrue(
+                    channelName.contains("TEST_DB"), "Channel name should contain database name");
+            Assertions.assertTrue(
+                    channelName.contains("TEST_SCHEMA"), "Channel name should contain schema name");
+            Assertions.assertTrue(
+                    channelName.contains("TEST_TABLE"), "Channel name should contain table name");
+            Assertions.assertTrue(
+                    channelName.contains("testAppId"), "Channel name should contain appId");
+            Assertions.assertTrue(channelName.contains("5"), "Channel name should contain taskId");
+        } catch (Exception e) {
+            Assertions.fail("Exception should not be thrown: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void testChannelNameFormatWithDifferentConfigs() {
+        // Test channel name format with different database/schema/table combinations
+        try (SnowflakeSinkServiceImpl sinkService1 =
+                        new FakeSnowflakeSinkServiceImpl(
+                                "app1",
+                                0,
+                                new Properties(),
+                                SnowflakeWriterConfig.builder().build(),
+                                SnowflakeChannelConfig.builder().build("DB1", "SCHEMA1", "TABLE1"),
+                                new FakeSinkWriterMetricGroup());
+                SnowflakeSinkServiceImpl sinkService2 =
+                        new FakeSnowflakeSinkServiceImpl(
+                                "app1",
+                                0,
+                                new Properties(),
+                                SnowflakeWriterConfig.builder().build(),
+                                SnowflakeChannelConfig.builder().build("DB2", "SCHEMA2", "TABLE2"),
+                                new FakeSinkWriterMetricGroup())) {
+
+            String channelName1 = sinkService1.getChannelName();
+            String channelName2 = sinkService2.getChannelName();
+
+            // Verify that different table configurations produce different channel names
+            Assertions.assertNotEquals(
+                    channelName1,
+                    channelName2,
+                    "Different table configurations should produce different channel names");
+
+            // Verify the expected prefix pattern for each
+            Assertions.assertTrue(
+                    channelName1.startsWith("DB1_SCHEMA1_TABLE1"),
+                    "Channel name should start with DB_SCHEMA_TABLE prefix");
+            Assertions.assertTrue(
+                    channelName2.startsWith("DB2_SCHEMA2_TABLE2"),
+                    "Channel name should start with DB_SCHEMA_TABLE prefix");
+        } catch (Exception e) {
+            Assertions.fail("Exception should not be thrown: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void testChannelNameUniquePerTaskId() {
+        // Test that different task IDs produce different channel names
+        try (SnowflakeSinkServiceImpl sinkService1 =
+                        new FakeSnowflakeSinkServiceImpl(
+                                "app",
+                                0,
+                                new Properties(),
+                                SnowflakeWriterConfig.builder().build(),
+                                SnowflakeChannelConfig.builder().build("DB", "SCHEMA", "TABLE"),
+                                new FakeSinkWriterMetricGroup());
+                SnowflakeSinkServiceImpl sinkService2 =
+                        new FakeSnowflakeSinkServiceImpl(
+                                "app",
+                                1,
+                                new Properties(),
+                                SnowflakeWriterConfig.builder().build(),
+                                SnowflakeChannelConfig.builder().build("DB", "SCHEMA", "TABLE"),
+                                new FakeSinkWriterMetricGroup())) {
+
+            String channelName1 = sinkService1.getChannelName();
+            String channelName2 = sinkService2.getChannelName();
+
+            // Verify that different task IDs produce different channel names
+            Assertions.assertNotEquals(
+                    channelName1,
+                    channelName2,
+                    "Different task IDs should produce different channel names");
+
+            // Both should contain the same table prefix
+            Assertions.assertTrue(channelName1.contains("DB_SCHEMA_TABLE"));
+            Assertions.assertTrue(channelName2.contains("DB_SCHEMA_TABLE"));
+        } catch (Exception e) {
+            Assertions.fail("Exception should not be thrown: " + e.getMessage());
+        }
+    }
+
     private static class FakeSnowflakeSinkServiceImpl extends SnowflakeSinkServiceImpl {
 
         /**
