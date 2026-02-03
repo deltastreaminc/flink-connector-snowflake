@@ -57,6 +57,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SnowflakeSinkServiceImpl.class);
 
+    private static final long CHANNEL_RECREATE_THRESHOLD = 1_000_000; // 1M records of inserted rows
+
     // downstream configuration
     private final SnowflakeWriterConfig writerConfig;
     private final SnowflakeChannelConfig channelConfig;
@@ -67,10 +69,12 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     private final String channelName;
     // The expected offset to be committed by the Snowpipe channel
     private long offset;
+    // Number of rows inserted since the last channel open
+    private long rowsInserted = 0;
 
     /**
      * 1-1 mapping between client/channel/flink subtask Channel for communicating with the Snowflake
-     * ingest APIs Per Snowflake documentation, the channel should be reopened on failure recovery.
+     * ingest APIs Per Snowflake documentation.
      */
     private SnowflakeStreamingIngestChannel channel;
 
@@ -117,7 +121,15 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             SinkWriterMetricGroup metricGroup) {
         this.writerConfig = Preconditions.checkNotNull(writerConfig, "writerConfig");
         this.channelConfig = Preconditions.checkNotNull(channelConfig, "channelConfig");
-        this.channelName = SnowflakeInternalUtils.createClientOrChannelName(null, appId, taskId);
+        this.channelName =
+                SnowflakeInternalUtils.createClientOrChannelName(
+                        String.format(
+                                "%s_%s_%s",
+                                channelConfig.getDatabaseName(),
+                                channelConfig.getSchemaName(),
+                                channelConfig.getTableName()),
+                        appId,
+                        taskId);
 
         // ingest client
         this.client = this.createClientFromConfig(appId, connectionConfig);
@@ -140,6 +152,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     @Override
     public void insert(Map<String, Object> row) throws IOException {
         try {
+            this.rowsInserted++;
             this.offset++;
             InsertValidationResponse response =
                     this.getChannel().insertRow(row, Long.toString(offset));
@@ -162,6 +175,21 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
     @Override
     public void flush() throws IOException {
+
+        // trigger flush in the background
+        this.flushAsync();
+
+        // await committed offset, and reset channel state, if applicable
+        this.alignOffsetAndReset();
+    }
+
+    /**
+     * Flush the Snowflake ingest channel asynchronously without waiting for the result. The Offset
+     * commit will must be handled separately after on-demand flush.
+     *
+     * @throws IOException on flush failure
+     */
+    private void flushAsync() throws IOException {
 
         /*
          * The ingest channel periodically flushes data based on the buffer configuration, and
@@ -188,7 +216,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         if (flushRes instanceof CompletableFuture) {
             try {
                 ((CompletableFuture<?>) flushRes).get();
-                LOGGER.info("Successfully flushed channel '{}'", this.getChannelName());
+                LOGGER.info("Successfully triggered channel '{}' flush", this.getChannelName());
             } catch (InterruptedException | ExecutionException e) {
                 throw new IOException("Snowflake channel flush did not finish successfully", e);
             }
@@ -198,23 +226,46 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                             "Snowflake channel flush did not return a handle to wait on: got %s",
                             flushRes.getClass().getSimpleName()));
         }
+    }
+
+    /**
+     * After flush, align the expected offset with the committed offset from the Snowflake ingest
+     * channel. If the offsets do not align, wait until they do. Then, reset the internal state of
+     * the channel if needed. Reseting is done by recreating the channel after a threshold of
+     * inserted rows is reached.
+     */
+    private void alignOffsetAndReset() {
 
         /*
          * After flush has completed, wait until the Snowflake ingest channel offset matches the expected
-         * number of records we have just flushed. In this code block, we retry infinitely (with 1 second
+         * number of records we have just flushed. In this code block, we retry infinitely (with 1-second
          * sleep between tries). If the offset on the channel never catches up to our expected offset,
          * the Flink job will eventually abort the checkpoint after the checkpoint timeout duration has
          * expired.
          */
-        while (this.getLatestCommittedOffsetFromSnowflakeIngestChannel() < this.offset) {
+        int retryCount = 0;
+        long committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        while (committedOffset < this.offset) {
             try {
-                LOGGER.info(
-                        "Sleeping 1000ms to allow Snowflake ingest channel committed offsets to catch up");
+                //noinspection BusyWait
                 Thread.sleep(1000L);
             } catch (InterruptedException e) {
                 LOGGER.warn(
                         "Thread sleep interrupted while waiting for Snowflake records to flush");
             }
+            retryCount++;
+            LOGGER.info(
+                    "Waiting for Snowflake ingest channel '{}' to commit offset {}/{} (retry #{})",
+                    this.getChannelName(),
+                    committedOffset,
+                    this.offset,
+                    retryCount);
+            committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        }
+
+        // after successful flush, check if we should recreate the channel
+        if (this.rowsInserted >= CHANNEL_RECREATE_THRESHOLD) {
+            this.recreateChannel();
         }
     }
 
@@ -254,8 +305,25 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         return channel;
     }
 
+    void recreateChannel() {
+        LOGGER.info("Recreating channel '{}' to clear internal state", this.channelName);
+        this.closeChannel();
+        this.channel = this.openChannelFromConfig();
+        this.rowsInserted = 0;
+        LOGGER.info("Successfully recreated channel '{}'", this.channelName);
+    }
+
     @Override
     public void close() throws Exception {
+
+        LOGGER.info("Closing Snowflake ingest client '{}'", this.getClient().getName());
+        IOUtils.closeAll(this.getClient());
+        LOGGER.info(
+                "Snowflake ingest client '{}' has been successfully closed",
+                this.getClient().getName());
+    }
+
+    void closeChannel() {
         if (!this.getChannel().isClosed()) {
             LOGGER.info("Closing Snowflake ingest channel '{}'", this.getChannel().getName());
 
@@ -271,12 +339,6 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                     "Snowflake ingest channel '{}' has been successfully closed",
                     this.getChannel().getName());
         }
-
-        LOGGER.info("Closing Snowflake ingest client '{}'", this.getClient().getName());
-        IOUtils.closeAll(this.getClient());
-        LOGGER.info(
-                "Snowflake ingest client '{}' has been successfully closed",
-                this.getClient().getName());
     }
 
     /**
