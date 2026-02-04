@@ -121,15 +121,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             SinkWriterMetricGroup metricGroup) {
         this.writerConfig = Preconditions.checkNotNull(writerConfig, "writerConfig");
         this.channelConfig = Preconditions.checkNotNull(channelConfig, "channelConfig");
-        this.channelName =
-                SnowflakeInternalUtils.createClientOrChannelName(
-                        String.format(
-                                "%s_%s_%s",
-                                channelConfig.getDatabaseName(),
-                                channelConfig.getSchemaName(),
-                                channelConfig.getTableName()),
-                        appId,
-                        taskId);
+        this.channelName = SnowflakeInternalUtils.createClientOrChannelName(appId, taskId);
 
         // ingest client
         this.client = this.createClientFromConfig(appId, connectionConfig);
