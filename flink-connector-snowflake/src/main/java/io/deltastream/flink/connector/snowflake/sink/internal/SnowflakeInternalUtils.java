@@ -36,7 +36,7 @@ public class SnowflakeInternalUtils {
      * @return {@link java.lang.String} concatenated non-empty and non-null parts, separated by "_"
      */
     public static String createClientOrChannelName(
-            @Nullable final String prefix, final String name, @Nullable final Integer id) {
+            final String prefix, final String name, @Nullable final Integer id) {
         Preconditions.checkState(
                 StringUtils.isNotBlank(prefix) || StringUtils.isNotBlank(name),
                 "One of prefix or name must be set for ingest client/channel name");
@@ -46,5 +46,18 @@ public class SnowflakeInternalUtils {
                         StringUtils.isBlank(prefix) ? null : prefix,
                         StringUtils.isEmpty(name) ? null : name,
                         id);
+    }
+
+    /**
+     * Generate a name for ingest client or channel from given parts, skipping null or empty parts.
+     *
+     * @param name {@link java.lang.String} a name
+     * @param id {@link java.lang.Integer} an identifier number
+     * @return {@link java.lang.String} concatenated non-empty and non-null parts, separated by "_"
+     */
+    public static String createClientOrChannelName(final String name, @Nullable final Integer id) {
+        Preconditions.checkState(
+                StringUtils.isNotBlank(name), "name must be set for ingest client/channel name");
+        return Joiner.on("_").skipNulls().join(StringUtils.isEmpty(name) ? null : name, id);
     }
 }
