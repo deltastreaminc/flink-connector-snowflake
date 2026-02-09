@@ -18,7 +18,6 @@
 package io.deltastream.flink.connector.snowflake.sink;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.IOUtils;
@@ -55,7 +54,6 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
     private final SnowflakeRowSerializationSchema<IN> serializationSchema;
 
     // internal states
-    private boolean checkpointInProgress = false;
     private final SnowflakeSinkContext sinkContext;
 
     SnowflakeSinkWriter(
@@ -95,17 +93,6 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
         }
     }
 
-    @VisibleForTesting
-    SnowflakeSinkWriter(
-            final SnowflakeSinkContext sinkContext,
-            final SnowflakeSinkService sinkService,
-            SnowflakeRowSerializationSchema<IN> serializationSchema) {
-
-        this.sinkContext = sinkContext;
-        this.serializationSchema = serializationSchema;
-        this.sinkService = sinkService;
-    }
-
     @Override
     public void write(IN element, Context context) throws IOException {
 
@@ -123,11 +110,9 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
                 endOfInput,
                 this.sinkContext.isFlushOnCheckpoint());
 
-        this.checkpointInProgress = true;
         if (this.sinkContext.isFlushOnCheckpoint() || endOfInput) {
             this.sinkService.flush();
         }
-        this.checkpointInProgress = false;
     }
 
     @Override

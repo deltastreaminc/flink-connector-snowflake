@@ -69,6 +69,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     private final String channelName;
     // The expected offset to be committed by the Snowpipe channel
     private long offset;
+    // The last committed offset that was confirmed by Snowflake
+    private long lastCommittedOffset;
     // Number of rows inserted since the last channel open
     private long rowsInserted = 0;
 
@@ -79,7 +81,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     private SnowflakeStreamingIngestChannel channel;
 
     // metrics
-    private final Counter numRecordsSendCounter;
+    private final Counter numRecordsOut;
+    private final Counter numRecordsIn;
     private final Counter numRecordsSendError;
 
     public SnowflakeWriterConfig getWriterConfig() {
@@ -133,32 +136,28 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                 this.getClient().getName());
         this.channel = Preconditions.checkNotNull(this.openChannelFromConfig());
         this.offset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        this.lastCommittedOffset = this.offset;
 
         // metrics counters
         final SinkWriterMetricGroup sinkMetricGroup =
                 Preconditions.checkNotNull(metricGroup, "metricGroup");
-        this.numRecordsSendCounter = sinkMetricGroup.getNumRecordsSendCounter();
+        this.numRecordsIn = sinkMetricGroup.getIOMetricGroup().getNumRecordsInCounter();
+        this.numRecordsOut = sinkMetricGroup.getIOMetricGroup().getNumRecordsOutCounter();
         this.numRecordsSendError = sinkMetricGroup.getNumRecordsSendErrorsCounter();
     }
 
     @Override
     public void insert(Map<String, Object> row) throws IOException {
         try {
+            this.numRecordsIn.inc();
             this.rowsInserted++;
             this.offset++;
             InsertValidationResponse response =
                     this.getChannel().insertRow(row, Long.toString(offset));
-            this.numRecordsSendCounter.inc();
             LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
 
             // handle possible errors
-            if (ObjectUtils.isNotEmpty(response) && response.hasErrors()) {
-                LOGGER.debug(
-                        "Encountered error on row submission to Snowflake ingest channel '{}'",
-                        this.getChannelName());
-                this.numRecordsSendError.inc(response.getErrorRowCount());
-                this.handleInsertRowsErrors(response.getInsertErrors());
-            }
+            this.handleInsertRowsErrors(response);
         } catch (SFException e) {
             // SFException can be thrown by insertRow()
             throw new IOException("Failed to insert row with Snowflake sink service", e);
@@ -238,7 +237,24 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         int retryCount = 0;
         long committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
         while (committedOffset < this.offset) {
+
+            /*
+             * As records are committed during the wait, we incrementally report to metrics to provide
+             * real-time visibility into the underlying flush progress.
+             * This won't report anything if the flush flow is not used to align offsets, e.g. when delivery
+             * guarantee is NONE.
+             */
+            this.reportNumRecordsOut(committedOffset);
+
             try {
+                LOGGER.info(
+                        "Waiting for Snowflake ingest channel '{}' to commit offset {}/{} (retry #{}, {} records remaining)",
+                        this.getChannelName(),
+                        committedOffset,
+                        this.offset,
+                        retryCount,
+                        this.offset - committedOffset);
+
                 //noinspection BusyWait
                 Thread.sleep(1000L);
             } catch (InterruptedException e) {
@@ -246,18 +262,33 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         "Thread sleep interrupted while waiting for Snowflake records to flush");
             }
             retryCount++;
-            LOGGER.info(
-                    "Waiting for Snowflake ingest channel '{}' to commit offset {}/{} (retry #{})",
-                    this.getChannelName(),
-                    committedOffset,
-                    this.offset,
-                    retryCount);
             committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
         }
+
+        /*
+         * At this point, the committed offset has caught up to the expected offset after flush,
+         * so we can report any remaining committed records to metrics.
+         */
+        this.reportNumRecordsOut(committedOffset);
 
         // after successful flush, check if we should recreate the channel
         if (this.rowsInserted >= CHANNEL_RECREATE_THRESHOLD) {
             this.recreateChannel();
+        }
+    }
+
+    /**
+     * Report the number of newly committed records to metrics based on the committed offset from
+     * the Snowflake ingest channel. This method is used to incrementally report records committed
+     * to Snowflake.
+     *
+     * @param committedOffset the latest committed offset from the Snowflake ingest channel
+     */
+    private void reportNumRecordsOut(long committedOffset) {
+        final long newlyCommittedRecords = committedOffset - this.lastCommittedOffset;
+        if (newlyCommittedRecords > 0) {
+            this.numRecordsOut.inc(newlyCommittedRecords);
+            this.lastCommittedOffset += newlyCommittedRecords;
         }
     }
 
@@ -337,22 +368,27 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      * Handle errors when {@link InsertValidationResponse} encounters issues. Throws a {@link
      * FlinkRuntimeException} if there were issues, making this handling fatal without any retries.
      *
-     * @param errors {@link List (InsertValidationResponse.InsertError)}
+     * @param insertValidation {@link InsertValidationResponse}
      */
-    private void handleInsertRowsErrors(List<InsertValidationResponse.InsertError> errors)
+    private void handleInsertRowsErrors(InsertValidationResponse insertValidation)
             throws IOException {
 
-        // no-op
-        if (errors.isEmpty()) {
+        // no-op, if no insert validation or validation had no errors
+        if (ObjectUtils.isEmpty(insertValidation) || !insertValidation.hasErrors()) {
             return;
         }
+
+        LOGGER.debug(
+                "Encountered error on row submission to Snowflake ingest channel '{}'",
+                this.getChannelName());
+        this.numRecordsSendError.inc(insertValidation.getErrorRowCount());
 
         // fatal
         throw new IOException(
                 String.format(
                         "Encountered errors while ingesting rows into Snowflake: %s",
-                        errors.get(0).getException().getMessage()),
-                errors.get(0).getException());
+                        insertValidation.getInsertErrors().get(0).getException().getMessage()),
+                insertValidation.getInsertErrors().get(0).getException());
     }
 
     protected long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
