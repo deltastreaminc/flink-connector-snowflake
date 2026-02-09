@@ -507,6 +507,84 @@ class SnowflakeSinkServiceImplTest {
 
         @Override
         public OperatorIOMetricGroup getIOMetricGroup() {
+            return new FakeOperatorIOMetricGroup();
+        }
+
+        @Override
+        public Counter counter(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <C extends Counter> C counter(String name, C counter) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <T, G extends Gauge<T>> G gauge(String name, G gauge) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <H extends Histogram> H histogram(String name, H histogram) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <M extends Meter> M meter(String name, M meter) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public MetricGroup addGroup(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public MetricGroup addGroup(String key, String value) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String[] getScopeComponents() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Map<String, String> getAllVariables() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getMetricIdentifier(String metricName) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getMetricIdentifier(String metricName, CharacterFilter filter) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class FakeOperatorIOMetricGroup implements OperatorIOMetricGroup {
+
+        @Override
+        public Counter getNumRecordsInCounter() {
+            return new SimpleCounter();
+        }
+
+        @Override
+        public Counter getNumRecordsOutCounter() {
+            return new SimpleCounter();
+        }
+
+        @Override
+        public Counter getNumBytesInCounter() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Counter getNumBytesOutCounter() {
             throw new UnsupportedOperationException();
         }
 
