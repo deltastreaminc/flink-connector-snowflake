@@ -157,13 +157,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
 
             // handle possible errors
-            if (ObjectUtils.isNotEmpty(response) && response.hasErrors()) {
-                LOGGER.debug(
-                        "Encountered error on row submission to Snowflake ingest channel '{}'",
-                        this.getChannelName());
-                this.numRecordsSendError.inc(response.getErrorRowCount());
-                this.handleInsertRowsErrors(response.getInsertErrors());
-            }
+            this.handleInsertRowsErrors(response);
         } catch (SFException e) {
             // SFException can be thrown by insertRow()
             throw new IOException("Failed to insert row with Snowflake sink service", e);
@@ -374,22 +368,27 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      * Handle errors when {@link InsertValidationResponse} encounters issues. Throws a {@link
      * FlinkRuntimeException} if there were issues, making this handling fatal without any retries.
      *
-     * @param errors {@link List (InsertValidationResponse.InsertError)}
+     * @param insertValidation {@link InsertValidationResponse}
      */
-    private void handleInsertRowsErrors(List<InsertValidationResponse.InsertError> errors)
+    private void handleInsertRowsErrors(InsertValidationResponse insertValidation)
             throws IOException {
 
-        // no-op
-        if (errors.isEmpty()) {
+        // no-op, if no insert validation or validation had no errors
+        if (ObjectUtils.isEmpty(insertValidation) || !insertValidation.hasErrors()) {
             return;
         }
+
+        LOGGER.debug(
+                "Encountered error on row submission to Snowflake ingest channel '{}'",
+                this.getChannelName());
+        this.numRecordsSendError.inc(insertValidation.getErrorRowCount());
 
         // fatal
         throw new IOException(
                 String.format(
                         "Encountered errors while ingesting rows into Snowflake: %s",
-                        errors.get(0).getException().getMessage()),
-                errors.get(0).getException());
+                        insertValidation.getInsertErrors().get(0).getException().getMessage()),
+                insertValidation.getInsertErrors().get(0).getException());
     }
 
     protected long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
