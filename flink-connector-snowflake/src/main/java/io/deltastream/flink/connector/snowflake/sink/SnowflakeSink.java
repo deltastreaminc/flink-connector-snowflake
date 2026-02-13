@@ -25,11 +25,10 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 import io.deltastream.flink.connector.snowflake.sink.context.DefaultSnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
-
-import java.util.Properties;
 
 /**
  * Flink Sink to produce data into a Snowflake table. The sink supports below delivery guarantees as
@@ -58,7 +57,7 @@ public class SnowflakeSink<IN> implements Sink<IN> {
     private static final long serialVersionUID = 3587917829427569404L;
 
     private final String appId;
-    private final Properties connectionConfigs;
+    private final SnowflakeClientConfig clientConfig;
     private final SnowflakeWriterConfig writerConfig;
     private final SnowflakeChannelConfig channelConfig;
     private final SnowflakeRowSerializationSchema<IN> serializationSchema;
@@ -67,8 +66,8 @@ public class SnowflakeSink<IN> implements Sink<IN> {
         return appId;
     }
 
-    public Properties getConnectionConfigs() {
-        return connectionConfigs;
+    public SnowflakeClientConfig getClientConfig() {
+        return clientConfig;
     }
 
     public SnowflakeWriterConfig getWriterConfig() {
@@ -85,7 +84,7 @@ public class SnowflakeSink<IN> implements Sink<IN> {
 
     SnowflakeSink(
             final String appId,
-            final Properties connectionConfigs,
+            final SnowflakeClientConfig clientConfig,
             final SnowflakeWriterConfig writerConfig,
             final SnowflakeChannelConfig channelConfig,
             final SnowflakeRowSerializationSchema<IN> serializationSchema) {
@@ -93,7 +92,7 @@ public class SnowflakeSink<IN> implements Sink<IN> {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(appId), "An application ID is required");
         this.appId = appId;
-        this.connectionConfigs = Preconditions.checkNotNull(connectionConfigs);
+        this.clientConfig = Preconditions.checkNotNull(clientConfig);
         this.writerConfig = Preconditions.checkNotNull(writerConfig);
         this.channelConfig = Preconditions.checkNotNull(channelConfig);
         this.serializationSchema = Preconditions.checkNotNull(serializationSchema);
@@ -108,10 +107,10 @@ public class SnowflakeSink<IN> implements Sink<IN> {
         return new SnowflakeSinkWriter<>(
                 new DefaultSnowflakeSinkContext(
                         Preconditions.checkNotNull(initContext, "initContext"),
-                        this.writerConfig,
-                        this.appId),
-                this.connectionConfigs,
-                this.channelConfig,
-                this.serializationSchema);
+                        this.getWriterConfig(),
+                        this.getAppId()),
+                this.getClientConfig(),
+                this.getChannelConfig(),
+                this.getSerializationSchema());
     }
 }

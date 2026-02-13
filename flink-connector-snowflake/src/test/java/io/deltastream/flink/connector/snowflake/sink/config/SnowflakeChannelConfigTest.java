@@ -1,6 +1,5 @@
 package io.deltastream.flink.connector.snowflake.sink.config;
 
-import net.snowflake.ingest.streaming.OpenChannelRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -13,20 +12,10 @@ class SnowflakeChannelConfigTest {
     @Test
     public void testChannelConfigBuild() {
         final SnowflakeChannelConfig sfcc =
-                SnowflakeChannelConfig.builder()
-                        .onErrorOption(OpenChannelRequest.OnErrorOption.CONTINUE)
-                        .build(databaseName, schemaName, tableName);
+                SnowflakeChannelConfig.builder().build(databaseName, schemaName, tableName);
         Assertions.assertEquals(databaseName, sfcc.getDatabaseName());
         Assertions.assertEquals(schemaName, sfcc.getSchemaName());
         Assertions.assertEquals(tableName, sfcc.getTableName());
-        Assertions.assertEquals(OpenChannelRequest.OnErrorOption.CONTINUE, sfcc.getOnErrorOption());
-    }
-
-    @Test
-    public void testChannelConfigBuildWithDefaultErrorOption() {
-        final SnowflakeChannelConfig sfcc =
-                SnowflakeChannelConfig.builder().build(databaseName, schemaName, tableName);
-        Assertions.assertEquals(OpenChannelRequest.OnErrorOption.ABORT, sfcc.getOnErrorOption());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package io.deltastream.flink.connector.snowflake.sink;
 
+import io.deltastream.flink.connector.snowflake.sink.internal.ClientOptions;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ class SnowflakeSinkBuilderTest {
                         .url("test-url")
                         .user("test-user")
                         .role("test-role")
+                        .accountId("test-accountId")
                         .database("test_db")
                         .schema("test_schema")
                         .table("test_table")
@@ -24,11 +26,11 @@ class SnowflakeSinkBuilderTest {
                                         (element, sinkContext) -> element))
                         .build("build-test");
 
-        Assertions.assertThat(sink.getConnectionConfigs())
+        Assertions.assertThat(sink.getClientConfig().getConnectionProps())
                 .containsKeys(
-                        SnowflakeSinkBuilder.SNOWFLAKE_URL_CONFIG_NAME,
-                        SnowflakeSinkBuilder.SNOWFLAKE_USER_CONFIG_NAME,
-                        SnowflakeSinkBuilder.SNOWFLAKE_ROLE_CONFIG_NAME);
+                        ClientOptions.URL.key(),
+                        ClientOptions.USER.key(),
+                        ClientOptions.ROLE.key());
     }
 
     @Test
@@ -38,7 +40,7 @@ class SnowflakeSinkBuilderTest {
                                 SnowflakeSink.builder()
                                         .user("test-user")
                                         .role("test-role")
-                                        .checkConnectionProps())
+                                        .build("build-test"))
                 .hasMessageContaining("Required connection properties documented by Snowflake");
     }
 
@@ -49,7 +51,7 @@ class SnowflakeSinkBuilderTest {
                                 SnowflakeSink.builder()
                                         .url("test-url")
                                         .role("test-role")
-                                        .checkConnectionProps())
+                                        .build("build-test"))
                 .hasMessageContaining("Required connection properties documented by Snowflake");
     }
 
@@ -60,7 +62,7 @@ class SnowflakeSinkBuilderTest {
                                 SnowflakeSink.builder()
                                         .url("test-url")
                                         .user("test-user")
-                                        .checkConnectionProps())
+                                        .build("build-test"))
                 .hasMessageContaining("Required connection properties documented by Snowflake");
     }
 
@@ -77,6 +79,12 @@ class SnowflakeSinkBuilderTest {
     }
 
     @Test
+    public void testFailureOnInvalidAccountIdConnectionProperty() {
+        Assertions.assertThatThrownBy(() -> SnowflakeSink.builder().accountId(""))
+                .hasMessage("Invalid accountId");
+    }
+
+    @Test
     public void testFailureOnMissingPrivateKeyWithPassphrase() {
         Assertions.assertThatThrownBy(
                         () ->
@@ -84,14 +92,15 @@ class SnowflakeSinkBuilderTest {
                                         .url("test-url")
                                         .user("test-user")
                                         .role("test-role")
+                                        .accountId("test-accountId")
                                         .keyPassphrase("some-passphrase")
-                                        .checkConnectionProps())
+                                        .build("build-test"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
                         String.format(
                                 "%s requires %s",
-                                SnowflakeSinkBuilder.SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME,
-                                SnowflakeSinkBuilder.SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME));
+                                ClientOptions.PRIVATE_KEY_PASSPHRASE.key(),
+                                ClientOptions.PRIVATE_KEY.key()));
     }
 
     @Test
@@ -101,6 +110,7 @@ class SnowflakeSinkBuilderTest {
                         .url("test-url")
                         .user("test-user")
                         .role("test-role")
+                        .accountId("test-accountId")
                         .database("test_db")
                         .schema("test_schema")
                         .table("test_table")
@@ -112,8 +122,9 @@ class SnowflakeSinkBuilderTest {
 
         final SnowflakeSink<Map<String, Object>> sink = bSink.build("passphrase-test");
         Assertions.assertThat(
-                        sink.getConnectionConfigs()
-                                .get(SnowflakeSinkBuilder.SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME))
+                        sink.getClientConfig()
+                                .getConnectionProps()
+                                .get(ClientOptions.PRIVATE_KEY_PASSPHRASE.key()))
                 .isEqualTo("");
     }
 }

@@ -24,6 +24,7 @@ import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.internal.SnowflakeSinkService;
 import io.deltastream.flink.connector.snowflake.sink.internal.SnowflakeSinkServiceImpl;
@@ -32,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Properties;
 
 /**
  * This class is responsible to write records to a Snowflake Table and to handle {@link
@@ -58,7 +58,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
 
     SnowflakeSinkWriter(
             final SnowflakeSinkContext sinkContext,
-            final Properties connectionConfigs,
+            final SnowflakeClientConfig clientConfig,
             final SnowflakeChannelConfig channelConfig,
             SnowflakeRowSerializationSchema<IN> serializationSchema) {
 
@@ -84,7 +84,7 @@ class SnowflakeSinkWriter<IN> implements SinkWriter<IN> {
                     new SnowflakeSinkServiceImpl(
                             this.sinkContext.getAppId(),
                             this.sinkContext.getInitContext().getTaskInfo().getIndexOfThisSubtask(),
-                            connectionConfigs,
+                            clientConfig,
                             this.sinkContext.getWriterConfig(),
                             channelConfig,
                             this.sinkContext.getInitContext().metricGroup());

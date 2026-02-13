@@ -18,19 +18,12 @@
 package io.deltastream.flink.connector.snowflake.sink.internal;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava33.com.google.common.collect.Maps;
-
-import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClientFactory;
-import net.snowflake.ingest.utils.ParameterProvider;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClientFactory;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.Properties;
 
 /**
  * Facade to provide the underlying {@link SnowflakeStreamingIngestClient}. The lifecycle of the
@@ -45,56 +38,36 @@ public class SnowflakeStreamingIngestClientProvider {
 
     /**
      * Created based on the Snowflake client APIs and configuration. See <a
-     * href="https://javadoc.io/doc/net.snowflake/snowflake-ingest-sdk/2.0.2/net/snowflake/ingest/streaming/SnowflakeStreamingIngestClient.html">SnowflakeStreamingIngestClient</a>
-     * and <a
-     * href="https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-configuration">Configuring
-     * Snowpipe Streaming</a>
+     * href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations">
+     * Configuring Snowpipe Streaming</a>
      *
      * @param ingestName {@link java.lang.String} a name to uniquely identify the upstream
      *     application
-     * @param connectorProps {@link java.util.Properties} All required and optional Snowflake
-     *     streaming configs
+     * @param config {@link SnowflakeClientConfig} All required and optional Snowflake client
+     *     configs
      * @return {@link SnowflakeStreamingIngestClient} A new ingestion client
      */
     public static SnowflakeStreamingIngestClient createClient(
             final String ingestName,
-            final Properties connectorProps,
-            final SnowflakeWriterConfig writerConfig) {
+            final String databaseName,
+            final String schemaName,
+            final String tableName,
+            final SnowflakeClientConfig config) {
         final String ingestClientName =
                 SnowflakeInternalUtils.createClientOrChannelName(
                         STREAMING_INGEST_CLIENT_PREFIX_NAME, ingestName, null);
 
         SnowflakeStreamingIngestClient ingestClient =
-                SnowflakeStreamingIngestClientFactory.builder(ingestClientName)
-                        .setProperties(connectorProps)
-                        .setParameterOverrides(getParameterOverrides(writerConfig))
+                SnowflakeStreamingIngestClientFactory.builder(
+                                ingestClientName,
+                                databaseName,
+                                schemaName,
+                                String.format("%s-STREAMING", tableName))
+                        .setProperties(config.getConnectionProps())
                         .build();
 
         LOGGER.info(
                 "Successfully initialized Snowflake streaming ingest client {}", ingestClientName);
         return ingestClient;
-    }
-
-    /**
-     * Create a {@link java.util.Map} to provide for overriding the {@link
-     * SnowflakeStreamingIngestClient} properties.
-     *
-     * @param writerConfig {@link SnowflakeWriterConfig}
-     * @return {@link java.util.Map}
-     */
-    private static Map<String, Object> getParameterOverrides(
-            final SnowflakeWriterConfig writerConfig) {
-        Preconditions.checkNotNull(writerConfig, "writerConfig");
-        return Maps.newHashMap(
-                Map.of(
-                        ParameterProvider.MAX_CLIENT_LAG, // buffer time
-                        writerConfig.getMaxBufferTimeMs(),
-                        ParameterProvider.MAX_MEMORY_LIMIT_IN_BYTES,
-                        1024 * 1024 * 256L, // max memory limit 256MB
-                        ParameterProvider.MAX_CHANNEL_SIZE_IN_BYTES,
-                        1024 * 1024 * 10L, // max channel size 10MB
-                        ParameterProvider
-                                .ENABLE_SNOWPIPE_STREAMING_METRICS, // snowpipe streaming metrics
-                        true));
     }
 }

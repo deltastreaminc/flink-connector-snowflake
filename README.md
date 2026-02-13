@@ -50,7 +50,6 @@ class test {
             .url("account_url")
             .user("user_name")
             .role("role_name")
-            .bufferTimeMillis(2000L)
             .database("DB_NAME")
             .schema("SCHEMA_NAME")
             .table("TABLE_NAME")
@@ -64,7 +63,6 @@ where:
 * `url` is the account URL given by Snowflake, e.g. `https://<account-id>.snowflakecomputing.com`.
 * `user` is the username to use to connect to the Snowflake account.
 * `role` is the role with access to the table within the Snowflake account.
-* `bufferTimeMillis` is the time in milliseconds to buffer records before writing them to Snowflake. _NOTE: The buffer is also flushed when a checkpoint is triggered or the job is stopped._ See [Checkpointing with Flink](#checkpointing-with-flink).
 * `database` is the database name within the Snowflake account. See note below about case sensitivity.
 * `schema` is the schema name within the Snowflake account. See note below about case sensitivity.
 * `table` is the table name within the Snowflake account. See note below about case sensitivity.

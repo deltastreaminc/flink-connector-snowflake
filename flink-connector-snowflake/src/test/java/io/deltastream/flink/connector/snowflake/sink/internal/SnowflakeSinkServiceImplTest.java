@@ -11,16 +11,16 @@ import org.apache.flink.metrics.groups.OperatorIOMetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.snowflake.ingest.streaming.ChannelStatus;
+import com.snowflake.ingest.streaming.ErrorCode;
+import com.snowflake.ingest.streaming.FakeSnowflakeStreamingIngestChannel;
+import com.snowflake.ingest.streaming.FakeSnowflakeStreamingIngestClient;
+import com.snowflake.ingest.streaming.SFException;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
-import net.snowflake.ingest.streaming.FakeSnowflakeStreamingIngestChannel;
-import net.snowflake.ingest.streaming.FakeSnowflakeStreamingIngestClient;
-import net.snowflake.ingest.streaming.InsertValidationResponse;
-import net.snowflake.ingest.streaming.InsertValidationResponse.InsertError;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
-import net.snowflake.ingest.utils.ErrorCode;
-import net.snowflake.ingest.utils.SFException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 class SnowflakeSinkServiceImplTest {
 
@@ -38,16 +37,19 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
                         new FakeSinkWriterMetricGroup())) {
-            Assertions.assertEquals(
-                    0, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
+            Assertions.assertEquals(0, sinkService.getLatestCommittedOffsetFromChannelStatus());
             sinkService.insert(Map.of("field_1", "val_1"));
-            Assertions.assertEquals(
-                    1, sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel());
+            Assertions.assertEquals(1, sinkService.getLatestCommittedOffsetFromChannelStatus());
         }
     }
 
@@ -57,7 +59,12 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
@@ -70,9 +77,8 @@ class SnowflakeSinkServiceImplTest {
                                 this.getChannelConfig().getSchemaName(),
                                 this.getChannelConfig().getTableName()) {
                             @Override
-                            public InsertValidationResponse insertRow(
-                                    Map<String, Object> row, String offsetToken) {
-                                throw new SFException(ErrorCode.INTERNAL_ERROR, "test");
+                            public void appendRow(Map<String, Object> row, String offsetToken) {
+                                throw new SFException(ErrorCode.FATAL, "test");
                             }
                         };
                     }
@@ -81,8 +87,13 @@ class SnowflakeSinkServiceImplTest {
                     Assertions.assertThrows(
                             IOException.class,
                             () -> sinkService.insert(Map.of("field_1", "val_1")));
-            Assertions.assertTrue(
-                    e.getMessage().contains("Failed to insert row with Snowflake sink service"));
+            org.assertj.core.api.Assertions.assertThat(e.getMessage())
+                    .contains("Failed to append row with Snowflake sink service");
+            Assertions.assertInstanceOf(SFException.class, e.getCause());
+            Assertions.assertEquals(
+                    ErrorCode.FATAL.getErrorCodeName(),
+                    ((SFException) e.getCause()).getErrorCodeName());
+            org.assertj.core.api.Assertions.assertThat(e.getCause().getMessage()).contains("test");
         }
     }
 
@@ -92,7 +103,12 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
@@ -105,15 +121,8 @@ class SnowflakeSinkServiceImplTest {
                                 this.getChannelConfig().getSchemaName(),
                                 this.getChannelConfig().getTableName()) {
                             @Override
-                            public InsertValidationResponse insertRow(
-                                    Map<String, Object> row, String offsetToken) {
-                                InsertValidationResponse res = new InsertValidationResponse();
-                                InsertError insertError =
-                                        new InsertError(row, Long.parseLong(offsetToken));
-                                insertError.setException(
-                                        new SFException(ErrorCode.INTERNAL_ERROR, "test"));
-                                res.addError(insertError);
-                                return res;
+                            public void appendRow(Map<String, Object> row, String offsetToken) {
+                                throw new SFException(ErrorCode.FATAL, "test");
                             }
                         };
                     }
@@ -122,10 +131,11 @@ class SnowflakeSinkServiceImplTest {
                     Assertions.assertThrows(
                             IOException.class,
                             () -> sinkService.insert(Map.of("field_1", "val_1")));
-            Assertions.assertTrue(
-                    e.getMessage()
-                            .contains(
-                                    "Encountered errors while ingesting rows into Snowflake: Ingest client internal error: test."));
+            Assertions.assertInstanceOf(SFException.class, e.getCause());
+            Assertions.assertEquals(
+                    ErrorCode.FATAL.getErrorCodeName(),
+                    ((SFException) e.getCause()).getErrorCodeName());
+            org.assertj.core.api.Assertions.assertThat(e.getCause().getMessage()).contains("test");
         }
     }
 
@@ -139,38 +149,37 @@ class SnowflakeSinkServiceImplTest {
                                 new FakeSnowflakeSinkServiceImpl(
                                         "appId",
                                         0,
-                                        new Properties(),
+                                        SnowflakeClientConfig.builder()
+                                                .url("https://org-acct.sfcomputing.com")
+                                                .user("testUser")
+                                                .role("testRole")
+                                                .accountId("acct")
+                                                .build(),
                                         SnowflakeWriterConfig.builder().build(),
                                         SnowflakeChannelConfig.builder()
                                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
                                         new FakeSinkWriterMetricGroup()) {
                                     @Override
-                                    public SnowflakeStreamingIngestClient getClient() {
-                                        return new FakeSnowflakeStreamingIngestClient(
-                                                this.getChannelName()) {
+                                    public SnowflakeStreamingIngestChannel getChannel() {
+                                        return new FakeSnowflakeStreamingIngestChannel(
+                                                this.getChannelName(),
+                                                this.getChannelConfig().getDatabaseName(),
+                                                this.getChannelConfig().getSchemaName(),
+                                                this.getChannelConfig().getTableName()) {
+
                                             @Override
-                                            public Map<String, String>
-                                                    getLatestCommittedOffsetTokens(
-                                                            List<SnowflakeStreamingIngestChannel>
-                                                                    channels) {
-                                                Map<String, String> offsetTokens = new HashMap<>();
-                                                channels.forEach(
-                                                        c -> {
-                                                            String fqn = c.getFullyQualifiedName();
-                                                            String token = "invalid_token";
-                                                            offsetTokens.put(fqn, token);
-                                                        });
-                                                return offsetTokens;
+                                            public ChannelStatus getChannelStatus() {
+                                                return this.createValidChannelStatus(
+                                                        "invalid_token");
                                             }
                                         };
                                     }
                                 });
-        Assertions.assertTrue(
-                e.getMessage()
-                        .contains(
-                                String.format(
-                                        "The offsetToken '%s' cannot be parsed as a long for channel",
-                                        "invalid_token")));
+        org.assertj.core.api.Assertions.assertThat(e.getMessage())
+                .contains(
+                        String.format(
+                                "The offsetToken '%s' cannot be parsed as a long for channel",
+                                "invalid_token"));
         Assertions.assertInstanceOf(NumberFormatException.class, e.getCause());
     }
 
@@ -181,7 +190,12 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "testAppId",
                         5,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("TEST_DB", "TEST_SCHEMA", "TEST_TABLE"),
@@ -204,7 +218,12 @@ class SnowflakeSinkServiceImplTest {
                         new FakeSnowflakeSinkServiceImpl(
                                 "app",
                                 0,
-                                new Properties(),
+                                SnowflakeClientConfig.builder()
+                                        .url("https://org-acct.sfcomputing.com")
+                                        .user("testUser")
+                                        .role("testRole")
+                                        .accountId("acct")
+                                        .build(),
                                 SnowflakeWriterConfig.builder().build(),
                                 SnowflakeChannelConfig.builder().build("DB", "SCHEMA", "TABLE"),
                                 new FakeSinkWriterMetricGroup());
@@ -212,7 +231,12 @@ class SnowflakeSinkServiceImplTest {
                         new FakeSnowflakeSinkServiceImpl(
                                 "app",
                                 1,
-                                new Properties(),
+                                SnowflakeClientConfig.builder()
+                                        .url("https://org-acct.sfcomputing.com")
+                                        .user("testUser")
+                                        .role("testRole")
+                                        .accountId("acct")
+                                        .build(),
                                 SnowflakeWriterConfig.builder().build(),
                                 SnowflakeChannelConfig.builder().build("DB", "SCHEMA", "TABLE"),
                                 new FakeSinkWriterMetricGroup())) {
@@ -241,7 +265,12 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
@@ -258,7 +287,7 @@ class SnowflakeSinkServiceImplTest {
             // Verify offset is aligned after flush
             Assertions.assertEquals(
                     3,
-                    sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel(),
+                    sinkService.getLatestCommittedOffsetFromChannelStatus(),
                     "Committed offset should match inserted records after flush");
         }
     }
@@ -270,36 +299,52 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
                         new FakeSinkWriterMetricGroup()) {
 
                     private int offsetCheckCount = 0;
+                    private SnowflakeStreamingIngestClient cachedClient;
 
                     @Override
                     public SnowflakeStreamingIngestClient getClient() {
-                        return new FakeSnowflakeStreamingIngestClient(this.getChannelName()) {
-                            @Override
-                            public Map<String, String> getLatestCommittedOffsetTokens(
-                                    List<SnowflakeStreamingIngestChannel> channels) {
-                                offsetCheckCount++;
-                                Map<String, String> offsetTokens = new HashMap<>();
-                                channels.forEach(
-                                        c -> {
-                                            String fqn = c.getFullyQualifiedName();
-                                            // Simulate delayed commit: only return correct offset
-                                            // after 3 checks
-                                            String token =
-                                                    offsetCheckCount < 3
-                                                            ? "0"
-                                                            : c.getLatestCommittedOffsetToken();
-                                            offsetTokens.put(fqn, token);
-                                        });
-                                return offsetTokens;
-                            }
-                        };
+                        if (cachedClient == null) {
+                            cachedClient =
+                                    new FakeSnowflakeStreamingIngestClient(
+                                            this.getChannelName(),
+                                            this.getChannelConfig().getDatabaseName(),
+                                            this.getChannelConfig().getSchemaName(),
+                                            this.getChannelConfig().getTableName()) {
+                                        @Override
+                                        public Map<String, String> getLatestCommittedOffsetTokens(
+                                                List<String> channels) {
+                                            offsetCheckCount++;
+                                            Map<String, String> offsetTokens = new HashMap<>();
+                                            channels.forEach(
+                                                    channelName -> {
+                                                        // Simulate delayed commit: only return
+                                                        // correct offset
+                                                        // after 3 checks
+                                                        String token =
+                                                                offsetCheckCount < 3
+                                                                        ? "0"
+                                                                        : this.getChannelCache()
+                                                                                .get(channelName)
+                                                                                .getLatestCommittedOffsetToken();
+                                                        offsetTokens.put(channelName, token);
+                                                    });
+                                            return offsetTokens;
+                                        }
+                                    };
+                        }
+                        return cachedClient;
                     }
                 }) {
 
@@ -313,66 +358,8 @@ class SnowflakeSinkServiceImplTest {
             // Verify offset eventually aligned
             Assertions.assertEquals(
                     2,
-                    sinkService.getLatestCommittedOffsetFromSnowflakeIngestChannel(),
+                    sinkService.getLatestCommittedOffsetFromChannelStatus(),
                     "Committed offset should eventually align after retries");
-        }
-    }
-
-    @Test
-    void testChannelRecreationAfterThreshold() throws Exception {
-        // Test that channel is recreated after 1M inserts
-        final int threshold = 1_000_000;
-
-        try (TestableSnowflakeSinkServiceImpl sinkService =
-                new TestableSnowflakeSinkServiceImpl(
-                        "appId",
-                        0,
-                        new Properties(),
-                        SnowflakeWriterConfig.builder().build(),
-                        SnowflakeChannelConfig.builder()
-                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
-                        new FakeSinkWriterMetricGroup())) {
-
-            // Insert threshold number of records
-            for (int i = 0; i < threshold; i++) {
-                sinkService.insert(Map.of("field", "value_" + i));
-            }
-
-            // Flush should trigger channel recreation
-            sinkService.flush();
-
-            // Verify channel was recreated by checking the flag
-            Assertions.assertTrue(
-                    sinkService.wasChannelRecreated(),
-                    "Channel should be recreated after reaching threshold");
-        }
-    }
-
-    @Test
-    void testChannelNotRecreatedBelowThreshold() throws Exception {
-        // Test that channel is NOT recreated below 1M inserts
-        try (TestableSnowflakeSinkServiceImpl sinkService =
-                new TestableSnowflakeSinkServiceImpl(
-                        "appId",
-                        0,
-                        new Properties(),
-                        SnowflakeWriterConfig.builder().build(),
-                        SnowflakeChannelConfig.builder()
-                                .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
-                        new FakeSinkWriterMetricGroup())) {
-
-            // Insert well below threshold
-            for (int i = 0; i < 100; i++) {
-                sinkService.insert(Map.of("field", "value_" + i));
-            }
-
-            // Flush should NOT trigger channel recreation
-            sinkService.flush();
-
-            // Verify channel was not recreated
-            Assertions.assertFalse(
-                    sinkService.wasChannelRecreated(),
-                    "Channel should not be recreated below threshold");
         }
     }
 
@@ -385,33 +372,41 @@ class SnowflakeSinkServiceImplTest {
                 new FakeSnowflakeSinkServiceImpl(
                         "appId",
                         0,
-                        new Properties(),
+                        SnowflakeClientConfig.builder()
+                                .url("https://org-acct.sfcomputing.com")
+                                .user("testUser")
+                                .role("testRole")
+                                .accountId("acct")
+                                .build(),
                         SnowflakeWriterConfig.builder().build(),
                         SnowflakeChannelConfig.builder()
                                 .build("FAKE_DB", "FAKE_SCHEMA", "FAKE_TABLE"),
                         new FakeSinkWriterMetricGroup()) {
 
+                    private SnowflakeStreamingIngestChannel cachedChannel;
+
                     @Override
-                    public SnowflakeStreamingIngestClient getClient() {
-                        return new FakeSnowflakeStreamingIngestClient(this.getChannelName()) {
-                            @Override
-                            public Map<String, String> getLatestCommittedOffsetTokens(
-                                    List<SnowflakeStreamingIngestChannel> channels) {
-                                callCount[0]++;
-                                Map<String, String> offsetTokens = new HashMap<>();
-                                channels.forEach(
-                                        c -> {
-                                            String fqn = c.getFullyQualifiedName();
+                    public SnowflakeStreamingIngestChannel getChannel() {
+                        if (cachedChannel == null) {
+                            cachedChannel =
+                                    new FakeSnowflakeStreamingIngestChannel(
+                                            this.getChannelName(),
+                                            this.getChannelConfig().getDatabaseName(),
+                                            this.getChannelConfig().getSchemaName(),
+                                            this.getChannelConfig().getTableName()) {
+
+                                        @Override
+                                        public ChannelStatus getChannelStatus() {
+                                            callCount[0]++;
                                             // Return correct offset after 5 retries
-                                            String token =
-                                                    callCount[0] <= 5
-                                                            ? "0"
-                                                            : c.getLatestCommittedOffsetToken();
-                                            offsetTokens.put(fqn, token);
-                                        });
-                                return offsetTokens;
-                            }
-                        };
+                                            return callCount[0] <= 5
+                                                    ? this.createValidChannelStatus("0")
+                                                    : this.createValidChannelStatus(
+                                                            this.getLatestCommittedOffsetToken());
+                                        }
+                                    };
+                        }
+                        return cachedChannel;
                     }
                 }) {
 
@@ -420,7 +415,7 @@ class SnowflakeSinkServiceImplTest {
 
             // Verify that we actually did multiple retries (should be called during construction +
             // retries + final check)
-            Assertions.assertTrue(callCount[0] > 5, "Should have made multiple retry attempts");
+            org.assertj.core.api.Assertions.assertThat(callCount[0]).isGreaterThan(5);
         }
     }
 
@@ -431,7 +426,7 @@ class SnowflakeSinkServiceImplTest {
          *
          * @param appId {@link String} UID for Flink job
          * @param taskId {@link Integer} Flink subtask ID
-         * @param connectionConfig {@link Properties} Snowflake connection settings
+         * @param clientConfig {@link SnowflakeClientConfig}
          * @param writerConfig {@link SnowflakeWriterConfig}
          * @param channelConfig {@link SnowflakeChannelConfig}
          * @param metricGroup {@link SinkWriterMetricGroup}
@@ -439,42 +434,52 @@ class SnowflakeSinkServiceImplTest {
         public FakeSnowflakeSinkServiceImpl(
                 String appId,
                 int taskId,
-                Properties connectionConfig,
+                SnowflakeClientConfig clientConfig,
                 SnowflakeWriterConfig writerConfig,
                 SnowflakeChannelConfig channelConfig,
                 SinkWriterMetricGroup metricGroup) {
-            super(appId, taskId, connectionConfig, writerConfig, channelConfig, metricGroup);
+            super(appId, taskId, clientConfig, writerConfig, channelConfig, metricGroup);
         }
 
         @Override
         SnowflakeStreamingIngestClient createClientFromConfig(
-                final String appId, final Properties connectionConfig) {
-            return new FakeSnowflakeStreamingIngestClient(this.getChannelName());
+                final String appId,
+                final SnowflakeChannelConfig channelConfig,
+                final SnowflakeClientConfig clientConfig) {
+            return new FakeSnowflakeStreamingIngestClient(
+                    this.getChannelName(),
+                    channelConfig.getDatabaseName(),
+                    channelConfig.getSchemaName(),
+                    channelConfig.getTableName());
+        }
+
+        @Override
+        public SnowflakeStreamingIngestChannel getChannel() {
+            return this.openChannelFromConfig();
+        }
+
+        @Override
+        SnowflakeStreamingIngestChannel openChannelFromConfig() {
+            return this.getClient().openChannel(this.getChannelName()).getChannel();
+        }
+
+        @Override
+        void checkErrors() {
+            // no-op for testing
         }
     }
 
     /** Testable implementation that tracks channel recreation events. */
     private static class TestableSnowflakeSinkServiceImpl extends FakeSnowflakeSinkServiceImpl {
-        private boolean channelRecreated = false;
 
         public TestableSnowflakeSinkServiceImpl(
                 String appId,
                 int taskId,
-                Properties connectionConfig,
+                SnowflakeClientConfig clientConfig,
                 SnowflakeWriterConfig writerConfig,
                 SnowflakeChannelConfig channelConfig,
                 SinkWriterMetricGroup metricGroup) {
-            super(appId, taskId, connectionConfig, writerConfig, channelConfig, metricGroup);
-        }
-
-        @Override
-        void recreateChannel() {
-            super.recreateChannel();
-            channelRecreated = true;
-        }
-
-        public boolean wasChannelRecreated() {
-            return channelRecreated;
+            super(appId, taskId, clientConfig, writerConfig, channelConfig, metricGroup);
         }
     }
 

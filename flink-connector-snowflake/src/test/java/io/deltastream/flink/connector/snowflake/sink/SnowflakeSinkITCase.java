@@ -29,6 +29,8 @@ class SnowflakeSinkITCase {
             SystemUtils.getEnvironmentVariable("SNOWFLAKE_USER", "SF_USER");
     private static final String role =
             SystemUtils.getEnvironmentVariable("SNOWFLAKE_ROLE", "SF_ROLE");
+    private static final String accountId =
+            SystemUtils.getEnvironmentVariable("SNOWFLAKE_ACCOUNT_ID", "myOrg-myAccountName");
     private static final String key =
             SystemUtils.getEnvironmentVariable("SNOWFLAKE_PRIVATE_KEY", "");
     private static final String keyPass =
@@ -58,7 +60,7 @@ class SnowflakeSinkITCase {
                         .url(url)
                         .user(user)
                         .role(role)
-                        .bufferTimeMillis(2000L)
+                        .accountId(accountId)
                         .database("FLINK_STREAMING")
                         .schema("PUBLIC")
                         .table("\"stream_data_tbl\"") // case-sensitive table name
@@ -99,9 +101,9 @@ class SnowflakeSinkITCase {
             final String uuid = UUID.randomUUID().toString();
             return Maps.newHashMap(
                     Map.of(
-                            "\"id\"",
+                            "id",
                             uuid + "-" + id,
-                            "\"data\"",
+                            "data",
                             uuid + "_" + id)); // case-sensitive column names
         }
     }

@@ -104,8 +104,8 @@
         </dependency>
 
         <dependency>
-            <groupId>net.snowflake</groupId>
-            <artifactId>snowflake-ingest-sdk</artifactId>
+            <groupId>com.snowflake</groupId>
+            <artifactId>snowpipe-streaming</artifactId>
         </dependency>
 
         <dependency>
@@ -161,7 +161,7 @@
                             </artifactSet>
                             <filters>
                                 <filter>
-                                    <artifact>net.snowflake:snowflake-ingest-sdk</artifact>
+                                    <artifact>com.snowflake:snowflake-ingest-sdk</artifact>
                                     <excludes>
                                         <exclude>META-INF/io.netty.versions.properties</exclude>
                                     </excludes>
@@ -179,8 +179,8 @@
                             </filters>
                             <relocations>
                                 <relocation>
-                                    <pattern>net.snowflake</pattern>
-                                    <shadedPattern>org.apache.flink.shaded.net.snowflake</shadedPattern>
+                                    <pattern>com.snowflake</pattern>
+                                    <shadedPattern>org.apache.flink.shaded.com.snowflake</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

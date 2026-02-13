@@ -25,16 +25,12 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava33.com.google.common.collect.Lists;
-
+import com.snowflake.ingest.streaming.SFException;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
+import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
-import net.snowflake.ingest.streaming.InsertValidationResponse;
-import net.snowflake.ingest.streaming.OpenChannelRequest;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
-import net.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
-import net.snowflake.ingest.utils.SFException;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +38,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
+import java.time.Duration;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This class is the service implementation for managing ingest client and channel for writing
@@ -56,8 +52,6 @@ import java.util.concurrent.ExecutionException;
 public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SnowflakeSinkServiceImpl.class);
-
-    private static final long CHANNEL_RECREATE_THRESHOLD = 1_000_000; // 1M records of inserted rows
 
     // downstream configuration
     private final SnowflakeWriterConfig writerConfig;
@@ -71,14 +65,12 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     private long offset;
     // The last committed offset that was confirmed by Snowflake
     private long lastCommittedOffset;
-    // Number of rows inserted since the last channel open
-    private long rowsInserted = 0;
 
     /**
      * 1-1 mapping between client/channel/flink subtask Channel for communicating with the Snowflake
      * ingest APIs Per Snowflake documentation.
      */
-    private SnowflakeStreamingIngestChannel channel;
+    private final SnowflakeStreamingIngestChannel channel;
 
     // metrics
     private final Counter numRecordsOut;
@@ -110,7 +102,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      *
      * @param appId {@link java.lang.String} UID for Flink job
      * @param taskId {@link java.lang.Integer} Flink subtask ID
-     * @param connectionConfig {@link java.util.Properties} Snowflake connection settings
+     * @param clientConfig {@link SnowflakeClientConfig}
      * @param writerConfig {@link SnowflakeWriterConfig}
      * @param channelConfig {@link SnowflakeChannelConfig}
      * @param metricGroup {@link SinkWriterMetricGroup}
@@ -118,7 +110,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     public SnowflakeSinkServiceImpl(
             final String appId,
             final int taskId,
-            final Properties connectionConfig,
+            final SnowflakeClientConfig clientConfig,
             final SnowflakeWriterConfig writerConfig,
             final SnowflakeChannelConfig channelConfig,
             SinkWriterMetricGroup metricGroup) {
@@ -127,15 +119,15 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         this.channelName = SnowflakeInternalUtils.createClientOrChannelName(appId, taskId);
 
         // ingest client
-        this.client = this.createClientFromConfig(appId, connectionConfig);
+        this.client = this.createClientFromConfig(appId, channelConfig, clientConfig);
 
         // ingest channel
         LOGGER.info(
-                "Opening a new ingest channel '{}' for the client '{}'",
+                "Opening a new streaming channel '{}' for the client '{}'",
                 this.getChannelName(),
-                this.getClient().getName());
+                this.getClient().getClientName());
         this.channel = Preconditions.checkNotNull(this.openChannelFromConfig());
-        this.offset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        this.offset = this.getLatestCommittedOffsetFromChannelStatus();
         this.lastCommittedOffset = this.offset;
 
         // metrics counters
@@ -150,17 +142,14 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     public void insert(Map<String, Object> row) throws IOException {
         try {
             this.numRecordsIn.inc();
-            this.rowsInserted++;
             this.offset++;
-            InsertValidationResponse response =
-                    this.getChannel().insertRow(row, Long.toString(offset));
-            LOGGER.debug("Submitted row to Snowflake ingest channel '{}'", this.getChannelName());
+            this.getChannel().appendRow(row, Long.toString(offset));
+            LOGGER.debug("Submitted row to channel '{}'", this.getChannelName());
 
-            // handle possible errors
-            this.handleInsertRowsErrors(response);
+            // check whether there were any errors since the last insert, and fail early if so
+            this.checkErrors();
         } catch (SFException e) {
-            // SFException can be thrown by insertRow()
-            throw new IOException("Failed to insert row with Snowflake sink service", e);
+            throw new IOException("Failed to append row with Snowflake sink service", e);
         }
     }
 
@@ -189,22 +178,19 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
          */
         if (this.getWriterConfig().getDeliveryGuarantee().equals(DeliveryGuarantee.NONE)) {
             LOGGER.info(
-                    "Skipping force flush for Snowflake ingest channel '{}' for delivery guarantee NONE",
+                    "Skipping force flush for channel '{}' due to delivery guarantee of NONE",
                     this.getChannelName());
             return;
         }
 
+        // TODO move to waiter API for flush with channel
         LOGGER.debug("Flushing Snowflake ingest channel '{}'", this.getChannelName());
-
-        final Object flushRes =
-                invoke(
-                        this.getChannel(),
-                        "flush",
-                        Lists.newArrayList(boolean.class).toArray(Class<?>[]::new),
-                        Lists.newArrayList(false).toArray());
+        final Object flushRes = invoke(this.getChannel(), "initiateFlush");
 
         // wait for flush, otherwise fail the checkpoint
-        if (flushRes instanceof CompletableFuture) {
+        if (flushRes == null) {
+            LOGGER.debug("To be replaced with void Flush initiation");
+        } else if (flushRes instanceof CompletableFuture) {
             try {
                 ((CompletableFuture<?>) flushRes).get();
                 LOGGER.info("Successfully triggered channel '{}' flush", this.getChannelName());
@@ -235,7 +221,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
          * expired.
          */
         int retryCount = 0;
-        long committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+        long committedOffset = this.getLatestCommittedOffsetFromChannelStatus();
         while (committedOffset < this.offset) {
 
             /*
@@ -248,12 +234,13 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
             try {
                 LOGGER.info(
-                        "Waiting for Snowflake ingest channel '{}' to commit offset {}/{} (retry #{}, {} records remaining)",
+                        "Waiting for channel '{}' to commit offset {}/{} (retry #{}, {} records remaining, status {})",
                         this.getChannelName(),
                         committedOffset,
                         this.offset,
                         retryCount,
-                        this.offset - committedOffset);
+                        this.offset - committedOffset,
+                        this.getChannel().getChannelStatus().getStatusCode());
 
                 //noinspection BusyWait
                 Thread.sleep(1000L);
@@ -262,7 +249,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         "Thread sleep interrupted while waiting for Snowflake records to flush");
             }
             retryCount++;
-            committedOffset = this.getLatestCommittedOffsetFromSnowflakeIngestChannel();
+            committedOffset = this.getLatestCommittedOffsetFromChannelStatus();
         }
 
         /*
@@ -270,11 +257,6 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
          * so we can report any remaining committed records to metrics.
          */
         this.reportNumRecordsOut(committedOffset);
-
-        // after successful flush, check if we should recreate the channel
-        if (this.rowsInserted >= CHANNEL_RECREATE_THRESHOLD) {
-            this.recreateChannel();
-        }
     }
 
     /**
@@ -293,9 +275,15 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     }
 
     SnowflakeStreamingIngestClient createClientFromConfig(
-            final String appId, final Properties connectionConfig) {
+            final String appId,
+            final SnowflakeChannelConfig channelConfig,
+            final SnowflakeClientConfig clientConfig) {
         return SnowflakeStreamingIngestClientProvider.createClient(
-                appId, connectionConfig, this.getWriterConfig());
+                appId,
+                channelConfig.getDatabaseName(),
+                channelConfig.getSchemaName(),
+                channelConfig.getTableName(),
+                clientConfig);
     }
 
     /**
@@ -308,105 +296,113 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      * @return {@link SnowflakeStreamingIngestChannel}
      */
     SnowflakeStreamingIngestChannel openChannelFromConfig() {
-        OpenChannelRequest channelRequest =
-                OpenChannelRequest.builder(this.getChannelName())
-                        .setDBName(this.getChannelConfig().getDatabaseName())
-                        .setSchemaName(this.getChannelConfig().getSchemaName())
-                        .setTableName(this.getChannelConfig().getTableName())
-                        .setOnErrorOption(this.getChannelConfig().getOnErrorOption())
-                        .build();
         LOGGER.debug(
                 "Opening a '{}' channel for table '{}'",
                 this.getChannelName(),
                 this.getChannelConfig().getTableName());
         final SnowflakeStreamingIngestChannel channel =
-                this.getClient().openChannel(channelRequest);
+                this.getClient().openChannel(this.getChannelName()).getChannel();
         LOGGER.info(
                 "Successfully opened channel '{}' for table '{}'",
-                this.getChannelName(),
+                channel.getFullyQualifiedChannelName(),
                 this.getChannelConfig().getTableName());
         return channel;
     }
 
-    void recreateChannel() {
-        LOGGER.info("Recreating channel '{}' to clear internal state", this.channelName);
-        this.closeChannel();
-        this.channel = this.openChannelFromConfig();
-        this.rowsInserted = 0;
-        LOGGER.info("Successfully recreated channel '{}'", this.channelName);
-    }
-
     @Override
     public void close() throws Exception {
+        try {
+            this.closeChannel();
+        } catch (SFException e) {
 
-        LOGGER.info("Closing Snowflake ingest client '{}'", this.getClient().getName());
+            // gracefully logging an error to allow the rest of the resources to be cleaned up
+            LOGGER.error(
+                    "Failed to cleanly close the channel '{}', and some records may not have been committed",
+                    this.getChannelName(),
+                    e);
+        }
+
+        LOGGER.info("Closing Snowflake client '{}'", this.getClient().getClientName());
         IOUtils.closeAll(this.getClient());
         LOGGER.info(
                 "Snowflake ingest client '{}' has been successfully closed",
-                this.getClient().getName());
+                this.getClient().getClientName());
     }
 
-    void closeChannel() {
-        if (!this.getChannel().isClosed()) {
-            LOGGER.info("Closing Snowflake ingest channel '{}'", this.getChannel().getName());
+    /**
+     * Synchronously close the channel, which will trigger a commit of all buffered data. If the
+     * channel is already closed, this method is a no-op.
+     *
+     * @throws SFException if the close operation fails, which should be handled by the caller.
+     */
+    void closeChannel() throws SFException {
 
-            // attempt to close (and it commits buffered data)
-            try {
-                this.getChannel().close().get();
-            } catch (InterruptedException | ExecutionException e) {
-                LOGGER.error(
-                        "Failed to cleanly close the Snowflake ingest channel '{}'",
-                        this.getChannelName());
-            }
+        // no-op if channel is already closed
+        if (this.getChannel().isClosed()) {
+            return;
+        }
+
+        try {
+            /*
+             * attempt to close, and wait for the flush to complete with a timeout of half the
+             * max buffer time
+             */
+            LOGGER.info(
+                    "Closing Snowflake ingest channel '{}'", this.getChannel().getChannelName());
+            this.getChannel()
+                    .close(
+                            true,
+                            Duration.ofSeconds(
+                                    SnowflakeChannelConfig.GLOBAL_API_TIMEOUT_MS_DEFAULT));
             LOGGER.info(
                     "Snowflake ingest channel '{}' has been successfully closed",
-                    this.getChannel().getName());
+                    this.getChannel().getChannelName());
+        } catch (TimeoutException e) {
+            LOGGER.error(
+                    "Failed to cleanly close the Snowflake ingest channel '{}', and some records may not have been committed",
+                    this.getChannelName());
         }
     }
 
     /**
-     * Handle errors when {@link InsertValidationResponse} encounters issues. Throws a {@link
-     * FlinkRuntimeException} if there were issues, making this handling fatal without any retries.
-     *
-     * @param insertValidation {@link InsertValidationResponse}
+     * Check whether the channel has encountered any issues. Throws a {@link FlinkRuntimeException}
+     * if there were issues, making this handling fatal without any retries.
      */
-    private void handleInsertRowsErrors(InsertValidationResponse insertValidation)
-            throws IOException {
-
-        // no-op, if no insert validation or validation had no errors
-        if (ObjectUtils.isEmpty(insertValidation) || !insertValidation.hasErrors()) {
+    void checkErrors() throws IOException {
+        /*
+         * no-op iff:
+         *   1) no insert validation or validation had no errors, AND
+         *   2) the channel status code is SUCCESS, which means the channel is healthy and able to process more rows
+         */
+        if (this.getChannel().getChannelStatus().getRowsErrorCount() <= 0
+                && this.getChannel().getChannelStatus().getStatusCode().equals("SUCCESS")) {
             return;
         }
 
         LOGGER.debug(
                 "Encountered error on row submission to Snowflake ingest channel '{}'",
                 this.getChannelName());
-        this.numRecordsSendError.inc(insertValidation.getErrorRowCount());
+        this.numRecordsSendError.inc(this.getChannel().getChannelStatus().getRowsErrorCount());
 
         // fatal
         throw new IOException(
                 String.format(
-                        "Encountered errors while ingesting rows into Snowflake: %s",
-                        insertValidation.getInsertErrors().get(0).getException().getMessage()),
-                insertValidation.getInsertErrors().get(0).getException());
+                        "Encountered errors while appending rows into Snowflake up to offset %s: code=%s, msg=%s",
+                        this.getChannel().getChannelStatus().getLastErrorOffsetTokenUpperBound(),
+                        this.getChannel().getChannelStatus().getStatusCode(),
+                        this.getChannel().getChannelStatus().getLastErrorMessage()));
     }
 
-    protected long getLatestCommittedOffsetFromSnowflakeIngestChannel() {
-        Map<String, String> offsetTokens =
-                this.getClient().getLatestCommittedOffsetTokens(List.of(this.getChannel()));
-        Preconditions.checkState(
-                offsetTokens.size() == 1,
-                String.format(
-                        "Expected getLatestCommittedOffsetTokens to return information for a single channel. Found %s offset tokens.",
-                        offsetTokens.size()));
-        String offsetToken = offsetTokens.get(offsetTokens.keySet().iterator().next());
+    protected long getLatestCommittedOffsetFromChannelStatus() {
+        String lastOffsetToken =
+                this.getChannel().getChannelStatus().getLatestCommittedOffsetToken();
         try {
-            return StringUtils.isEmpty(offsetToken) ? 0 : Long.parseLong(offsetToken);
+            return StringUtils.isEmpty(lastOffsetToken) ? 0 : Long.parseLong(lastOffsetToken);
         } catch (NumberFormatException e) {
             throw new FlinkRuntimeException(
                     String.format(
                             "The offsetToken '%s' cannot be parsed as a long for channel '%s'",
-                            offsetToken, this.getChannelName()),
+                            lastOffsetToken, this.getChannelName()),
                     e);
         }
     }
@@ -420,12 +416,12 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
      * @param args {@link java.lang.Object} array
      * @return {@link java.lang.Object} result of the invocation
      */
-    private static Object invoke(
-            Object object, String methodName, Class<?>[] argTypes, Object[] args) {
+    // TODO remove
+    private static Object invoke(Object object, String methodName) {
         try {
-            Method method = object.getClass().getDeclaredMethod(methodName, argTypes);
+            Method method = object.getClass().getMethod(methodName);
             method.setAccessible(true);
-            return method.invoke(object, args);
+            return method.invoke(object);
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException("Incompatible SnowflakeStreamingIngestChannel version", e);
         }

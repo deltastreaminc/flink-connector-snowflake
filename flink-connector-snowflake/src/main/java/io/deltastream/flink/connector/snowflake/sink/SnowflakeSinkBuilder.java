@@ -18,20 +18,14 @@
 package io.deltastream.flink.connector.snowflake.sink;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.StringUtils;
 
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
+import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
-import net.snowflake.ingest.streaming.OpenChannelRequest;
-import net.snowflake.ingest.utils.Constants;
-
-import java.util.List;
-import java.util.Properties;
 
 /**
  * Builder for constructing a {@link SnowflakeSink} with appropriate configurations.
@@ -41,19 +35,8 @@ import java.util.Properties;
 @PublicEvolving
 public class SnowflakeSinkBuilder<IN> {
 
-    static final String SNOWFLAKE_URL_CONFIG_NAME = Constants.ACCOUNT_URL;
-    static final String SNOWFLAKE_USER_CONFIG_NAME = Constants.USER;
-    static final String SNOWFLAKE_ROLE_CONFIG_NAME = Constants.ROLE;
-    static final String SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME = Constants.PRIVATE_KEY;
-    static final String SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME = Constants.PRIVATE_KEY_PASSPHRASE;
-
-    /**
-     * At minimum, needs to include the required properties as documented by Snowflake: <a
-     * href="https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-configuration#required-properties">Required
-     * connection settings</a>.
-     */
-    private final Properties connectionProps = new Properties();
-
+    private final SnowflakeClientConfig.SnowflakeClientConfigBuilder clientConfigBuilder =
+            SnowflakeClientConfig.builder();
     private final SnowflakeWriterConfig.SnowflakeWriterConfigBuilder writerConfigBuilder =
             SnowflakeWriterConfig.builder();
     private final SnowflakeChannelConfig.SnowflakeChannelConfigBuilder channelConfigBuilder =
@@ -74,10 +57,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> url(final String connectionUrl) {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(connectionUrl),
-                String.format("Invalid %s", SNOWFLAKE_URL_CONFIG_NAME));
-        this.connectionProps.put(SNOWFLAKE_URL_CONFIG_NAME, connectionUrl);
+        this.clientConfigBuilder.url(connectionUrl);
         return this;
     }
 
@@ -88,10 +68,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> user(final String connectionUser) {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(connectionUser),
-                String.format("Invalid %s", SNOWFLAKE_USER_CONFIG_NAME));
-        this.connectionProps.put(SNOWFLAKE_USER_CONFIG_NAME, connectionUser);
+        this.clientConfigBuilder.user(connectionUser);
         return this;
     }
 
@@ -102,10 +79,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> role(final String connectionRole) {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(connectionRole),
-                String.format("Invalid %s", SNOWFLAKE_ROLE_CONFIG_NAME));
-        this.connectionProps.put(SNOWFLAKE_ROLE_CONFIG_NAME, connectionRole);
+        this.clientConfigBuilder.role(connectionRole);
         return this;
     }
 
@@ -117,10 +91,7 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> privateKey(final String connectionPrivateKey) {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(connectionPrivateKey),
-                String.format("Invalid %s", SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME));
-        this.connectionProps.put(SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME, connectionPrivateKey);
+        this.clientConfigBuilder.privateKey(connectionPrivateKey);
         return this;
     }
 
@@ -131,10 +102,19 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@code this}
      */
     public SnowflakeSinkBuilder<IN> keyPassphrase(final String connectionKeyPassphrase) {
-        Preconditions.checkArgument(
-                connectionKeyPassphrase != null,
-                String.format("Invalid %s", SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME));
-        this.connectionProps.put(SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME, connectionKeyPassphrase);
+        this.clientConfigBuilder.keyPassphrase(connectionKeyPassphrase);
+        return this;
+    }
+
+    /**
+     * Set the Snowflake accountId name. This is the name included within the accountId ID of a
+     * Snowflake accountId, e.g. "xy12345" for an accountId ID of "abcdefg-xy12345".
+     *
+     * @param account {@link java.lang.String}
+     * @return {@code this}
+     */
+    public SnowflakeSinkBuilder<IN> accountId(final String account) {
+        this.clientConfigBuilder.accountId(account);
         return this;
     }
 
@@ -175,28 +155,6 @@ public class SnowflakeSinkBuilder<IN> {
         return this;
     }
 
-    /**
-     * Set the option for handling errors within a Snowflake ingest channel.
-     *
-     * @param option {@link net.snowflake.ingest.streaming.OpenChannelRequest.OnErrorOption}
-     * @return {@code this}
-     */
-    public SnowflakeSinkBuilder<IN> onErrorOption(final OpenChannelRequest.OnErrorOption option) {
-        this.channelConfigBuilder.onErrorOption(option);
-        return this;
-    }
-
-    /**
-     * Sets the maximum time, in milliseconds, to buffer incoming elements.
-     *
-     * @param bufferTimeMillis {@link long}
-     * @return {@code this}
-     */
-    public SnowflakeSinkBuilder<IN> bufferTimeMillis(final long bufferTimeMillis) {
-        this.writerConfigBuilder.maxBufferTimeMs(bufferTimeMillis);
-        return this;
-    }
-
     // ====================================================================
     // Sink writer configuration
     // ====================================================================
@@ -234,38 +192,15 @@ public class SnowflakeSinkBuilder<IN> {
      * @return {@link SnowflakeSink}
      */
     public SnowflakeSink<IN> build(final String appId) {
-        this.checkConnectionProps();
-
+        // TODO expose environment-based configuration options:
+        // TODO
+        // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations#environment-variables
         return new SnowflakeSink<>(
                 appId,
-                this.connectionProps,
+                this.clientConfigBuilder.build(),
                 this.writerConfigBuilder.build(),
                 this.channelConfigBuilder.build(this.database, this.schema, this.table),
                 Preconditions.checkNotNull(
                         this.serializationSchema, "A serialization schema must be provided"));
-    }
-
-    @VisibleForTesting
-    void checkConnectionProps() {
-
-        // check the minimum connectivity settings
-        Preconditions.checkArgument(
-                this.connectionProps
-                        .keySet()
-                        .containsAll(
-                                List.of(
-                                        SNOWFLAKE_URL_CONFIG_NAME,
-                                        SNOWFLAKE_USER_CONFIG_NAME,
-                                        SNOWFLAKE_ROLE_CONFIG_NAME)),
-                "Required connection properties documented by Snowflake must be set");
-
-        // key passphrase requires private key
-        if (this.connectionProps.containsKey(SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME)) {
-            Preconditions.checkArgument(
-                    this.connectionProps.containsKey(SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME),
-                    "%s requires %s",
-                    SNOWFLAKE_KEY_PASSPHRASE_CONFIG_NAME,
-                    SNOWFLAKE_PRIVATE_KEY_CONFIG_NAME);
-        }
     }
 }
