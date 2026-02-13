@@ -21,21 +21,20 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
-import net.snowflake.ingest.streaming.OpenChannelRequest;
-import net.snowflake.ingest.streaming.OpenChannelRequest.OnErrorOption;
-
 import java.io.Serializable;
 import java.util.Objects;
 
 /**
  * This class provides the configuration needed to create a {@link
- * net.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel}, e.g. database/schema/table name,
+ * com.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel}, e.g. database/schema/table name,
  * etc.
  */
 @PublicEvolving
 public final class SnowflakeChannelConfig implements Serializable {
 
     private static final long serialVersionUID = 3517937247835076255L;
+
+    public static final long GLOBAL_API_TIMEOUT_MS_DEFAULT = 5_000L;
 
     /**
      * Table name parts are treated as case-insensitive by Snowflake, meaning that the service will
@@ -47,8 +46,6 @@ public final class SnowflakeChannelConfig implements Serializable {
 
     private final String schemaName;
     private final String tableName;
-
-    private final OpenChannelRequest.OnErrorOption onErrorOption;
 
     public String getDatabaseName() {
         return databaseName;
@@ -62,15 +59,10 @@ public final class SnowflakeChannelConfig implements Serializable {
         return tableName;
     }
 
-    public OnErrorOption getOnErrorOption() {
-        return onErrorOption;
-    }
-
     private SnowflakeChannelConfig(SnowflakeChannelConfigBuilder builder) {
         this.databaseName = builder.databaseName;
         this.schemaName = builder.schemaName;
         this.tableName = builder.tableName;
-        this.onErrorOption = builder.onErrorOption;
     }
 
     @Override
@@ -103,14 +95,6 @@ public final class SnowflakeChannelConfig implements Serializable {
         private String databaseName;
         private String schemaName;
         private String tableName;
-        private OpenChannelRequest.OnErrorOption onErrorOption =
-                OpenChannelRequest.OnErrorOption.ABORT;
-
-        public SnowflakeChannelConfigBuilder onErrorOption(
-                final OpenChannelRequest.OnErrorOption onErrorOption) {
-            this.onErrorOption = Preconditions.checkNotNull(onErrorOption, "onErrorOption");
-            return this;
-        }
 
         /**
          * Build a {@link SnowflakeChannelConfig} from user-provided channel configurations.

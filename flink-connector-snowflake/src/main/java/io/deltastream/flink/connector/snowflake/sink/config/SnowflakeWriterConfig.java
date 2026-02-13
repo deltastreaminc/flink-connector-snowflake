@@ -33,24 +33,14 @@ public final class SnowflakeWriterConfig implements Serializable {
 
     private static final long serialVersionUID = 1806512982691643793L;
 
-    // buffer flush minimum and default
-    public static final long BUFFER_FLUSH_TIME_MILLISECONDS_DEFAULT = 1000;
-    public static final long BUFFER_FLUSH_TIME_MILLISECONDS_MIN = 1000;
-
     private final DeliveryGuarantee deliveryGuarantee;
-    private final long maxBufferTimeMs;
 
     public DeliveryGuarantee getDeliveryGuarantee() {
         return deliveryGuarantee;
     }
 
-    public long getMaxBufferTimeMs() {
-        return maxBufferTimeMs;
-    }
-
     private SnowflakeWriterConfig(SnowflakeWriterConfigBuilder builder) {
         this.deliveryGuarantee = builder.deliveryGuarantee;
-        this.maxBufferTimeMs = builder.maxBufferTimeMs;
     }
 
     @Override
@@ -62,13 +52,12 @@ public final class SnowflakeWriterConfig implements Serializable {
             return false;
         }
         SnowflakeWriterConfig that = (SnowflakeWriterConfig) o;
-        return Objects.equals(this.getDeliveryGuarantee(), that.getDeliveryGuarantee())
-                && Objects.equals(this.getMaxBufferTimeMs(), that.getMaxBufferTimeMs());
+        return Objects.equals(this.getDeliveryGuarantee(), that.getDeliveryGuarantee());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getDeliveryGuarantee(), this.getMaxBufferTimeMs());
+        return Objects.hash(this.getDeliveryGuarantee());
     }
 
     public static SnowflakeWriterConfigBuilder builder() {
@@ -80,7 +69,6 @@ public final class SnowflakeWriterConfig implements Serializable {
     public static class SnowflakeWriterConfigBuilder {
 
         private DeliveryGuarantee deliveryGuarantee = DeliveryGuarantee.AT_LEAST_ONCE;
-        private long maxBufferTimeMs = BUFFER_FLUSH_TIME_MILLISECONDS_DEFAULT;
 
         public SnowflakeWriterConfigBuilder deliveryGuarantee(
                 final DeliveryGuarantee deliveryGuarantee) {
@@ -88,15 +76,6 @@ public final class SnowflakeWriterConfig implements Serializable {
                     deliveryGuarantee != DeliveryGuarantee.EXACTLY_ONCE,
                     "Snowflake sink does not support an EXACTLY_ONCE delivery guarantee");
             this.deliveryGuarantee = Preconditions.checkNotNull(deliveryGuarantee);
-            return this;
-        }
-
-        public SnowflakeWriterConfigBuilder maxBufferTimeMs(final long maxBufferTimeMs) {
-            Preconditions.checkArgument(
-                    maxBufferTimeMs >= BUFFER_FLUSH_TIME_MILLISECONDS_MIN,
-                    "Buffer must be flushed at least every %s milliseconds",
-                    BUFFER_FLUSH_TIME_MILLISECONDS_MIN);
-            this.maxBufferTimeMs = maxBufferTimeMs;
             return this;
         }
 
