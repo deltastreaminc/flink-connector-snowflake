@@ -36,11 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -144,7 +141,9 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             this.numRecordsIn.inc();
             this.offset++;
             this.getChannel().appendRow(row, Long.toString(offset));
-            LOGGER.debug("Submitted row to channel '{}'", this.getChannelName());
+            LOGGER.debug(
+                    "Submitted row to channel '{}'",
+                    this.getChannel().getFullyQualifiedChannelName());
 
             // check whether there were any errors since the last insert, and fail early if so
             this.checkErrors();
@@ -155,8 +154,18 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
     @Override
     public void flush() throws IOException {
+        /*
+         * The ingest channel periodically flushes rows, and commits all buffered data on close.
+         * When we don't need to guarantee delivery, we skip on-demand flush.
+         */
+        if (this.getWriterConfig().getDeliveryGuarantee().equals(DeliveryGuarantee.NONE)) {
+            LOGGER.info(
+                    "Skipping committed offset alignment for channel '{}' due to delivery guarantee of NONE",
+                    this.getChannel().getFullyQualifiedChannelName());
+            return;
+        }
 
-        // trigger flush in the background
+        // trigger a flush
         this.flushAsync();
 
         // await committed offset, and reset channel state, if applicable
@@ -164,99 +173,71 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
     }
 
     /**
-     * Flush the Snowflake ingest channel asynchronously without waiting for the result. The Offset
-     * commit will must be handled separately after on-demand flush.
-     *
-     * @throws IOException on flush failure
+     * Flush and wait the Snowflake ingest channel to successfully execute flushing all pending
+     * rows. This method does not wait for all rows to be committed on the server side and that must
+     * be handled separately after channel flush has completed.
      */
     private void flushAsync() throws IOException {
+        LOGGER.debug(
+                "Flushing Snowflake ingest channel '{}'",
+                this.getChannel().getFullyQualifiedChannelName());
+        try {
 
-        /*
-         * The ingest channel periodically flushes data based on the buffer configuration, and
-         * commits all buffered data on close. So when we don't need to guarantee delivery, we
-         * skip forceful flush of data.
-         */
-        if (this.getWriterConfig().getDeliveryGuarantee().equals(DeliveryGuarantee.NONE)) {
-            LOGGER.info(
-                    "Skipping force flush for channel '{}' due to delivery guarantee of NONE",
-                    this.getChannelName());
-            return;
-        }
-
-        // TODO move to waiter API for flush with channel
-        LOGGER.debug("Flushing Snowflake ingest channel '{}'", this.getChannelName());
-        final Object flushRes = invoke(this.getChannel(), "initiateFlush");
-
-        // wait for flush, otherwise fail the checkpoint
-        if (flushRes == null) {
-            LOGGER.debug("To be replaced with void Flush initiation");
-        } else if (flushRes instanceof CompletableFuture) {
-            try {
-                ((CompletableFuture<?>) flushRes).get();
-                LOGGER.info("Successfully triggered channel '{}' flush", this.getChannelName());
-            } catch (InterruptedException | ExecutionException e) {
-                throw new IOException("Snowflake channel flush did not finish successfully", e);
-            }
-        } else {
-            throw new IOException(
-                    String.format(
-                            "Snowflake channel flush did not return a handle to wait on: got %s",
-                            flushRes.getClass().getSimpleName()));
+            // wait for the channel to flush all pending rows
+            this.getChannel().waitForFlush(null).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IOException("Snowflake channel flush did not finish successfully", e);
         }
     }
 
     /**
-     * After flush, align the expected offset with the committed offset from the Snowflake ingest
-     * channel. If the offsets do not align, wait until they do. Then, reset the internal state of
-     * the channel if needed. Reseting is done by recreating the channel after a threshold of
-     * inserted rows is reached.
+     * Attempt to align the expected offset with the committed offset from the Snowflake ingest
+     * channel, and wait until the offsets align. Then, reset the internal state of the channel if
+     * needed. Resetting is done by recreating the channel after a threshold of inserted rows is
+     * reached.
      */
-    private void alignOffsetAndReset() {
-
-        /*
-         * After flush has completed, wait until the Snowflake ingest channel offset matches the expected
-         * number of records we have just flushed. In this code block, we retry infinitely (with 1-second
-         * sleep between tries). If the offset on the channel never catches up to our expected offset,
-         * the Flink job will eventually abort the checkpoint after the checkpoint timeout duration has
-         * expired.
-         */
-        int retryCount = 0;
-        long committedOffset = this.getLatestCommittedOffsetFromChannelStatus();
-        while (committedOffset < this.offset) {
-
+    private void alignOffsetAndReset() throws IOException {
+        try {
             /*
-             * As records are committed during the wait, we incrementally report to metrics to provide
-             * real-time visibility into the underlying flush progress.
-             * This won't report anything if the flush flow is not used to align offsets, e.g. when delivery
-             * guarantee is NONE.
+             * Wait until the channel's offset passes the expected offset for records that were flushed.
+             * If the offset on the channel never catches up to our expected offset, the Flink job will
+             * eventually abort the checkpoint after the checkpoint timeout duration has expired.
              */
-            this.reportNumRecordsOut(committedOffset);
+            this.getChannel()
+                    .waitForCommit(
+                            serverOffset -> {
+                                boolean hasCaughtUp = true;
+                                long committedOffset = this.parseOffsetToken(serverOffset);
 
-            try {
-                LOGGER.info(
-                        "Waiting for channel '{}' to commit offset {}/{} (retry #{}, {} records remaining, status {})",
-                        this.getChannelName(),
-                        committedOffset,
-                        this.offset,
-                        retryCount,
-                        this.offset - committedOffset,
-                        this.getChannel().getChannelStatus().getStatusCode());
+                                // still waiting for the appended rows to be committed
+                                if (committedOffset < this.offset) {
+                                    hasCaughtUp = false;
 
-                //noinspection BusyWait
-                Thread.sleep(1000L);
-            } catch (InterruptedException e) {
-                LOGGER.warn(
-                        "Thread sleep interrupted while waiting for Snowflake records to flush");
-            }
-            retryCount++;
-            committedOffset = this.getLatestCommittedOffsetFromChannelStatus();
+                                    LOGGER.info(
+                                            "Waiting for channel '{}' to commit offset {}/{} ({} records remaining, status {})",
+                                            this.getChannel().getFullyQualifiedChannelName(),
+                                            committedOffset,
+                                            this.offset,
+                                            this.offset - committedOffset,
+                                            this.getChannel().getChannelStatus().getStatusCode());
+                                } // otherwise, all records are committed on the server
+
+                                /*
+                                 * As records are committed during the wait, we incrementally report to metrics to provide
+                                 * real-time visibility into the underlying flush progress, until all records are committed,
+                                 * and the committed offset had caught up to the expected offset at append.
+                                 * This won't report anything if the flush flow is not used to align offsets, e.g. when delivery
+                                 * guarantee is NONE.
+                                 */
+                                this.reportNumRecordsOut(committedOffset);
+                                return hasCaughtUp;
+                            },
+                            // TODO make configurable
+                            Duration.ofMinutes(30))
+                    .get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IOException("Failed to align Snowflake channel offset", e);
         }
-
-        /*
-         * At this point, the committed offset has caught up to the expected offset after flush,
-         * so we can report any remaining committed records to metrics.
-         */
-        this.reportNumRecordsOut(committedOffset);
     }
 
     /**
@@ -318,7 +299,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             // gracefully logging an error to allow the rest of the resources to be cleaned up
             LOGGER.error(
                     "Failed to cleanly close the channel '{}', and some records may not have been committed",
-                    this.getChannelName(),
+                    this.getChannel().getFullyQualifiedChannelName(),
                     e);
         }
 
@@ -348,7 +329,8 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
              * max buffer time
              */
             LOGGER.info(
-                    "Closing Snowflake ingest channel '{}'", this.getChannel().getChannelName());
+                    "Closing Snowflake ingest channel '{}'",
+                    this.getChannel().getFullyQualifiedChannelName());
             this.getChannel()
                     .close(
                             true,
@@ -356,11 +338,11 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                                     SnowflakeChannelConfig.GLOBAL_API_TIMEOUT_MS_DEFAULT));
             LOGGER.info(
                     "Snowflake ingest channel '{}' has been successfully closed",
-                    this.getChannel().getChannelName());
+                    this.getChannel().getFullyQualifiedChannelName());
         } catch (TimeoutException e) {
             LOGGER.error(
                     "Failed to cleanly close the Snowflake ingest channel '{}', and some records may not have been committed",
-                    this.getChannelName());
+                    this.getChannel().getFullyQualifiedChannelName());
         }
     }
 
@@ -381,7 +363,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
 
         LOGGER.debug(
                 "Encountered error on row submission to Snowflake ingest channel '{}'",
-                this.getChannelName());
+                this.getChannel().getFullyQualifiedChannelName());
         this.numRecordsSendError.inc(this.getChannel().getChannelStatus().getRowsErrorCount());
 
         // fatal
@@ -393,37 +375,33 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                         this.getChannel().getChannelStatus().getLastErrorMessage()));
     }
 
+    /**
+     * Get the last reported committed offset for the channel parsed as long. Throws {@link
+     * FlinkRuntimeException}, if not parsable.
+     *
+     * @return {@link java.lang.Long}
+     */
     protected long getLatestCommittedOffsetFromChannelStatus() {
-        String lastOffsetToken =
-                this.getChannel().getChannelStatus().getLatestCommittedOffsetToken();
+        return this.parseOffsetToken(
+                this.getChannel().getChannelStatus().getLatestCommittedOffsetToken());
+    }
+
+    /**
+     * Given a record offset token, parse as long and throw a {@link FlinkRuntimeException}, if not
+     * parsable.
+     *
+     * @param offsetToken {@link java.lang.String}
+     * @return {@link java.lang.Long}
+     */
+    private long parseOffsetToken(String offsetToken) {
         try {
-            return StringUtils.isEmpty(lastOffsetToken) ? 0 : Long.parseLong(lastOffsetToken);
+            return StringUtils.isEmpty(offsetToken) ? 0 : Long.parseLong(offsetToken);
         } catch (NumberFormatException e) {
             throw new FlinkRuntimeException(
                     String.format(
                             "The offsetToken '%s' cannot be parsed as a long for channel '%s'",
-                            lastOffsetToken, this.getChannelName()),
+                            offsetToken, this.getChannel().getFullyQualifiedChannelName()),
                     e);
-        }
-    }
-
-    /**
-     * Invoke ingest channel internal method using reflection.
-     *
-     * @param object {@link java.lang.Object}
-     * @param methodName {@link java.lang.String}
-     * @param argTypes {@link Class} array
-     * @param args {@link java.lang.Object} array
-     * @return {@link java.lang.Object} result of the invocation
-     */
-    // TODO remove
-    private static Object invoke(Object object, String methodName) {
-        try {
-            Method method = object.getClass().getMethod(methodName);
-            method.setAccessible(true);
-            return method.invoke(object);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-            throw new RuntimeException("Incompatible SnowflakeStreamingIngestChannel version", e);
         }
     }
 }

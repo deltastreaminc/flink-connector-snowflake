@@ -25,9 +25,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 class SnowflakeSinkServiceImplTest {
 
@@ -329,9 +332,10 @@ class SnowflakeSinkServiceImplTest {
                                             Map<String, String> offsetTokens = new HashMap<>();
                                             channels.forEach(
                                                     channelName -> {
-                                                        // Simulate delayed commit: only return
-                                                        // correct offset
-                                                        // after 3 checks
+                                                        /*
+                                                         * Simulate delayed commit:
+                                                         * Only return correct offset after 3 checks
+                                                         */
                                                         String token =
                                                                 offsetCheckCount < 3
                                                                         ? "0"
@@ -403,6 +407,44 @@ class SnowflakeSinkServiceImplTest {
                                                     ? this.createValidChannelStatus("0")
                                                     : this.createValidChannelStatus(
                                                             this.getLatestCommittedOffsetToken());
+                                        }
+
+                                        @Override
+                                        public CompletableFuture<Void> waitForCommit(
+                                                Predicate<String> tokenChecker,
+                                                Duration timeoutDuration) {
+
+                                            CompletableFuture<Void> commitFuture =
+                                                    new CompletableFuture<>();
+                                            CompletableFuture.supplyAsync(
+                                                    () -> {
+                                                        checkForCommitWithDelay(
+                                                                tokenChecker, commitFuture);
+                                                        return null;
+                                                    });
+                                            return commitFuture;
+                                        }
+
+                                        private void checkForCommitWithDelay(
+                                                Predicate<String> tokenChecker,
+                                                CompletableFuture<Void> commitFuture) {
+                                            String currentChannelCommittedToken =
+                                                    this.getChannelStatus()
+                                                            .getLatestCommittedOffsetToken();
+                                            boolean reachTargetToken =
+                                                    tokenChecker.test(currentChannelCommittedToken);
+
+                                            if (reachTargetToken) {
+                                                // Success - complete with null (Void)
+                                                commitFuture.complete(null);
+                                                return;
+                                            }
+                                            CompletableFuture.supplyAsync(
+                                                    () -> {
+                                                        checkForCommitWithDelay(
+                                                                tokenChecker, commitFuture);
+                                                        return null;
+                                                    });
                                         }
                                     };
                         }
