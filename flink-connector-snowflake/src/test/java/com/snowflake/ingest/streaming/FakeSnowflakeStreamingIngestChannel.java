@@ -126,7 +126,7 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
 
     @Override
     public CompletableFuture<Void> waitForFlush(Duration timeoutDuration) {
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
