@@ -22,6 +22,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.Objects;
 
 /**
@@ -34,7 +35,8 @@ public final class SnowflakeChannelConfig implements Serializable {
 
     private static final long serialVersionUID = 3517937247835076255L;
 
-    public static final long GLOBAL_API_TIMEOUT_MS_DEFAULT = 5_000L;
+    /** Default timeout for closing a channel. */
+    public static final long CHANNEL_CLOSE_TIMEOUT_MS_DEFAULT = 5_000L;
 
     /**
      * Table name parts are treated as case-insensitive by Snowflake, meaning that the service will
@@ -46,6 +48,7 @@ public final class SnowflakeChannelConfig implements Serializable {
 
     private final String schemaName;
     private final String tableName;
+    private final Duration channelCloseTimeout;
 
     public String getDatabaseName() {
         return databaseName;
@@ -59,10 +62,15 @@ public final class SnowflakeChannelConfig implements Serializable {
         return tableName;
     }
 
+    public Duration getChannelCloseTimeout() {
+        return channelCloseTimeout;
+    }
+
     private SnowflakeChannelConfig(SnowflakeChannelConfigBuilder builder) {
         this.databaseName = builder.databaseName;
         this.schemaName = builder.schemaName;
         this.tableName = builder.tableName;
+        this.channelCloseTimeout = builder.channelCloseTimeoutMs;
     }
 
     @Override
@@ -76,12 +84,17 @@ public final class SnowflakeChannelConfig implements Serializable {
         SnowflakeChannelConfig that = (SnowflakeChannelConfig) o;
         return Objects.equals(this.getDatabaseName(), that.getDatabaseName())
                 && Objects.equals(this.getSchemaName(), that.getSchemaName())
-                && Objects.equals(this.getTableName(), that.getTableName());
+                && Objects.equals(this.getTableName(), that.getTableName())
+                && Objects.equals(this.getChannelCloseTimeout(), that.getChannelCloseTimeout());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getDatabaseName(), this.getSchemaName(), this.getTableName());
+        return Objects.hash(
+                this.getDatabaseName(),
+                this.getSchemaName(),
+                this.getTableName(),
+                this.getChannelCloseTimeout());
     }
 
     public static SnowflakeChannelConfigBuilder builder() {
@@ -95,6 +108,33 @@ public final class SnowflakeChannelConfig implements Serializable {
         private String databaseName;
         private String schemaName;
         private String tableName;
+        private Duration channelCloseTimeoutMs =
+                Duration.ofMillis(CHANNEL_CLOSE_TIMEOUT_MS_DEFAULT);
+
+        /**
+         * Set the timeout duration for closing a channel. This is the maximum time the sink will
+         * wait for the channel to flush all buffered data when closing.
+         *
+         * <p>Default: 5 seconds
+         *
+         * @param channelCloseTimeoutMs timeout milliseconds, must be non-negative, a value of 0
+         *     indicates an infinite timeout
+         * @return {@code this}
+         */
+        public SnowflakeChannelConfigBuilder channelCloseTimeoutMs(
+                final long channelCloseTimeoutMs) {
+            Preconditions.checkNotNull(
+                    channelCloseTimeoutMs, "channelCloseTimeoutMs cannot be null");
+            Preconditions.checkArgument(
+                    channelCloseTimeoutMs >= 0, "channelCloseTimeoutMs must be non-negative");
+
+            if (channelCloseTimeoutMs == 0L) {
+                this.channelCloseTimeoutMs = Duration.ofMillis(Integer.MAX_VALUE);
+            } else {
+                this.channelCloseTimeoutMs = Duration.ofMillis(channelCloseTimeoutMs);
+            }
+            return this;
+        }
 
         /**
          * Build a {@link SnowflakeChannelConfig} from user-provided channel configurations.

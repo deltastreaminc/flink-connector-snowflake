@@ -36,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -232,8 +231,7 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
                                 this.reportNumRecordsOut(committedOffset);
                                 return hasCaughtUp;
                             },
-                            // TODO make configurable
-                            Duration.ofMinutes(30))
+                            this.getWriterConfig().getCommitTimeout())
                     .get();
         } catch (InterruptedException | ExecutionException e) {
             throw new IOException("Failed to align Snowflake channel offset", e);
@@ -324,18 +322,11 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
         }
 
         try {
-            /*
-             * attempt to close, and wait for the flush to complete with a timeout of half the
-             * max buffer time
-             */
+            // attempt to close, and wait for the flush to complete
             LOGGER.info(
                     "Closing Snowflake ingest channel '{}'",
                     this.getChannel().getFullyQualifiedChannelName());
-            this.getChannel()
-                    .close(
-                            true,
-                            Duration.ofSeconds(
-                                    SnowflakeChannelConfig.GLOBAL_API_TIMEOUT_MS_DEFAULT));
+            this.getChannel().close(true, this.getChannelConfig().getChannelCloseTimeout());
             LOGGER.info(
                     "Snowflake ingest channel '{}' has been successfully closed",
                     this.getChannel().getFullyQualifiedChannelName());

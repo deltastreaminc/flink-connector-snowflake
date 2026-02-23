@@ -146,7 +146,7 @@ public class FakeSnowflakeStreamingIngestChannel implements SnowflakeStreamingIn
                 schemaName,
                 tableName + "_pipe",
                 name,
-                "3",
+                "SUCCESS",
                 offsetToken,
                 java.time.Instant.now(),
                 rows.size(),

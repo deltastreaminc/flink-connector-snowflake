@@ -171,6 +171,37 @@ public class SnowflakeSinkBuilder<IN> {
     }
 
     /**
+     * Sets the timeout duration for waiting for committed offsets to align during flush operations.
+     * This is the maximum time the sink will wait for Snowflake to confirm that all buffered
+     * records have been committed before failing the checkpoint.
+     *
+     * <p>Default: {@link SnowflakeWriterConfig#COMMIT_TIMEOUT_DEFAULT} (5 minutes)
+     *
+     * @param commitTimeoutMs timeout milliseconds, must be non-negative, a value of 0 indicates an
+     *     infinite timeout
+     * @return {@code this}
+     */
+    public SnowflakeSinkBuilder<IN> commitTimeoutMs(final long commitTimeoutMs) {
+        this.writerConfigBuilder.commitTimeoutMs(commitTimeoutMs);
+        return this;
+    }
+
+    /**
+     * Sets the timeout duration for closing a channel. This is the maximum time the sink will wait
+     * for the channel to flush all buffered data when closing.
+     *
+     * <p>Default: {@link SnowflakeChannelConfig#CHANNEL_CLOSE_TIMEOUT_MS_DEFAULT} (5 seconds)
+     *
+     * @param channelCloseTimeoutMs timeout milliseconds, must be non-negative, a value of 0
+     *     indicates an infinite timeout
+     * @return {@code this}
+     */
+    public SnowflakeSinkBuilder<IN> channelCloseTimeoutMs(final long channelCloseTimeoutMs) {
+        this.channelConfigBuilder.channelCloseTimeoutMs(channelCloseTimeoutMs);
+        return this;
+    }
+
+    /**
      * Sets the serialization schema that provides serialization from {@link IN} to {@link
      * java.util.Map} row as documented above and by the Snowflake service.
      *

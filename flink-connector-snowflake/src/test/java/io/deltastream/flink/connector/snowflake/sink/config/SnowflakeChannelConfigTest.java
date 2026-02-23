@@ -66,4 +66,41 @@ class SnowflakeChannelConfigTest {
                                         .build(databaseName, schemaName, null));
         Assertions.assertEquals("Invalid table name", nullIae.getMessage());
     }
+
+    @Test
+    public void testDefaultChannelCloseTimeout() {
+        final SnowflakeChannelConfig sfcc =
+                SnowflakeChannelConfig.builder().build(databaseName, schemaName, tableName);
+        Assertions.assertEquals(
+                SnowflakeChannelConfig.CHANNEL_CLOSE_TIMEOUT_MS_DEFAULT,
+                sfcc.getChannelCloseTimeout().toMillis());
+    }
+
+    @Test
+    public void testCustomChannelCloseTimeout() {
+        final long customTimeoutMs = 15_000L; // 15 seconds
+        final SnowflakeChannelConfig sfcc =
+                SnowflakeChannelConfig.builder()
+                        .channelCloseTimeoutMs(customTimeoutMs)
+                        .build(databaseName, schemaName, tableName);
+        Assertions.assertEquals(customTimeoutMs, sfcc.getChannelCloseTimeout().toMillis());
+    }
+
+    @Test
+    public void testNegativeChannelCloseTimeout() {
+        final IllegalArgumentException iae =
+                Assertions.assertThrows(
+                        IllegalArgumentException.class,
+                        () -> SnowflakeChannelConfig.builder().channelCloseTimeoutMs(-1));
+        Assertions.assertEquals("channelCloseTimeoutMs must be non-negative", iae.getMessage());
+    }
+
+    @Test
+    public void testZeroChannelCloseTimeout() {
+        final SnowflakeChannelConfig sfcc =
+                SnowflakeChannelConfig.builder()
+                        .channelCloseTimeoutMs(0L)
+                        .build(databaseName, schemaName, tableName);
+        Assertions.assertEquals(Integer.MAX_VALUE, sfcc.getChannelCloseTimeout().toMillis());
+    }
 }
