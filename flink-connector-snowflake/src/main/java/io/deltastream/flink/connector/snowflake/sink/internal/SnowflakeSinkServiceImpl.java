@@ -257,6 +257,34 @@ public class SnowflakeSinkServiceImpl implements SnowflakeSinkService {
             final String appId,
             final SnowflakeChannelConfig channelConfig,
             final SnowflakeClientConfig clientConfig) {
+
+        LOGGER.info(
+                "Creating ingest client with following observability environment: [{}={}, {}={}, {}={}, {}={}]",
+                SnowflakeStreamingIngestClientProvider.ENABLE_METRICS_CONFIGURATION_KEY,
+                System.getenv()
+                        .getOrDefault(
+                                SnowflakeStreamingIngestClientProvider
+                                        .ENABLE_METRICS_CONFIGURATION_KEY,
+                                SnowflakeStreamingIngestClientProvider.ENABLE_METRICS_DEFAULT),
+                SnowflakeStreamingIngestClientProvider.METRICS_PORT_CONFIGURATION_KEY,
+                System.getenv()
+                        .getOrDefault(
+                                SnowflakeStreamingIngestClientProvider
+                                        .METRICS_PORT_CONFIGURATION_KEY,
+                                String.valueOf(
+                                        SnowflakeStreamingIngestClientProvider
+                                                .METRICS_PORT_DEFAULT)),
+                SnowflakeStreamingIngestClientProvider.METRICS_IP_CONFIGURATION_KEY,
+                System.getenv()
+                        .getOrDefault(
+                                SnowflakeStreamingIngestClientProvider.METRICS_IP_CONFIGURATION_KEY,
+                                SnowflakeStreamingIngestClientProvider.METRICS_IP_DEFAULT),
+                SnowflakeStreamingIngestClientProvider.LOG_LEVEL_CONFIGURATION_KEY,
+                System.getenv()
+                        .getOrDefault(
+                                SnowflakeStreamingIngestClientProvider.LOG_LEVEL_CONFIGURATION_KEY,
+                                SnowflakeStreamingIngestClientProvider.LOG_LEVEL_DEFAULT));
+
         return SnowflakeStreamingIngestClientProvider.createClient(
                 appId,
                 channelConfig.getDatabaseName(),

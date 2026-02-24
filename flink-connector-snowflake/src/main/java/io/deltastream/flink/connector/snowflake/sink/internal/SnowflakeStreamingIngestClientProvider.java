@@ -37,6 +37,24 @@ public class SnowflakeStreamingIngestClientProvider {
     private static final String STREAMING_INGEST_CLIENT_PREFIX_NAME = "FLINK_INGEST_CLIENT";
 
     /**
+     * Local representation of Snowflake streaming ingest client configuration keys and defaults. <a
+     * href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance
+     * -configurations#environment-variables">Environment Variables</a>
+     */
+    public static final String ENABLE_METRICS_CONFIGURATION_KEY = "SS_ENABLE_METRICS";
+
+    public static final String ENABLE_METRICS_DEFAULT = "FALSE";
+    public static final String METRICS_PORT_CONFIGURATION_KEY = "SS_METRICS_PORT";
+    public static final int METRICS_PORT_DEFAULT = 50000;
+    public static final String METRICS_IP_CONFIGURATION_KEY = "SS_METRICS_IP";
+    public static final String METRICS_IP_DEFAULT = "127.0.0.1";
+    public static final String LOG_LEVEL_CONFIGURATION_KEY = "SS_LOG_LEVEL";
+    // Options: info, warn, error
+    public static final String LOG_LEVEL_DEFAULT = "info";
+
+    /*======= End of Environment Variables =======*/
+
+    /**
      * Created based on the Snowflake client APIs and configuration. See <a
      * href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations">
      * Configuring Snowpipe Streaming</a>
