@@ -40,6 +40,77 @@ class SnowflakeClientConfigTest {
     }
 
     @Test
+    void testBuildExtractsAccountFromUrl() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .build();
+
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
+    }
+
+    @Test
+    void testBuildExtractsAccountFromUrlWithPort() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com:443")
+                        .user("testuser")
+                        .role("testrole")
+                        .build();
+
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
+    }
+
+    @Test
+    void testBuildExtractsAccountFromUrlWithPath() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com/path/to/resource")
+                        .user("testuser")
+                        .role("testrole")
+                        .build();
+
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
+    }
+
+    @Test
+    void testBuildExtractsAccountFromUrlWithoutProtocol() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .build();
+
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
+    }
+
+    @Test
+    void testBuildExplicitAccountOverridesExtraction() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("explicit_override")
+                        .build();
+
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("explicit_override");
+    }
+
+    @Test
     void testBuildFailsWhenAccountIdIsNotPresent() {
         Assertions.assertThatThrownBy(
                         () ->
@@ -49,8 +120,8 @@ class SnowflakeClientConfigTest {
                                         .role("testrole")
                                         .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Required connection properties documented")
-                .hasMessageContaining("[role, user, url]");
+                .hasMessageContaining(
+                        "Account ID must be either explicitly provided or extractable from the URL");
     }
 
     @Test
@@ -96,13 +167,16 @@ class SnowflakeClientConfigTest {
                         .url("https://myorg-myaccount.snowflakecomputing.com")
                         .user("testuser")
                         .role("testrole")
-                        .accountId("myorg-myaccount")
                         .privateKey("test-private-key")
                         .build();
 
         Assertions.assertThat(
                         config.getConnectionProps().getProperty(ClientOptions.PRIVATE_KEY.key()))
                 .isEqualTo("test-private-key");
+        // Verify account ID was extracted from URL
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
     }
 
     @Test
@@ -112,7 +186,6 @@ class SnowflakeClientConfigTest {
                         .url("https://myorg-myaccount.snowflakecomputing.com")
                         .user("testuser")
                         .role("testrole")
-                        .accountId("myorg-myaccount")
                         .privateKey("test-private-key")
                         .keyPassphrase("test-passphrase")
                         .build();
@@ -124,6 +197,10 @@ class SnowflakeClientConfigTest {
                         config.getConnectionProps()
                                 .getProperty(ClientOptions.PRIVATE_KEY_PASSPHRASE.key()))
                 .isEqualTo("test-passphrase");
+        // Verify account ID was extracted from URL
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
     }
 
     @Test

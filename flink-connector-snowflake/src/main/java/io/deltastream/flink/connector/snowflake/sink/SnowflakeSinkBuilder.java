@@ -108,8 +108,10 @@ public class SnowflakeSinkBuilder<IN> {
     }
 
     /**
-     * Set the Snowflake accountId name. This is the name included within the accountId ID of a
-     * Snowflake accountId, e.g. "xy12345" for an accountId ID of "abcdefg-xy12345".
+     * Set the Snowflake account identifier. This is optional if the URL provided via {@link
+     * #url(String)} follows the format {@code https://<account_id>.snowflakecomputing.com}, as the
+     * account ID will be automatically extracted from the URL. If provided explicitly, this value
+     * takes precedence over the extracted value.
      *
      * @param account {@link java.lang.String}
      * @return {@code this}

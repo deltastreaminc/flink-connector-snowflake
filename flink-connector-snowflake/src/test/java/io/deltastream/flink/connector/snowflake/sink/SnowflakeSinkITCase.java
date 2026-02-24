@@ -61,7 +61,6 @@ class SnowflakeSinkITCase {
                         .url(url)
                         .user(user)
                         .role(role)
-                        .accountId(accountId)
                         .observability(ObservabilityConfig.builder().enableMetrics())
                         .database("FLINK_STREAMING")
                         .schema("PUBLIC")

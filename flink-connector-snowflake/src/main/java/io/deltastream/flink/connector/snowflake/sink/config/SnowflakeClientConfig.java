@@ -107,7 +107,9 @@ public final class SnowflakeClientConfig implements Serializable {
         }
 
         /**
-         * Set the account identifier for the Snowflake service.
+         * Set the account identifier for the Snowflake service. This is optional if the URL follows
+         * the format {@code https://<account_id>.snowflakecomputing.com}, as the account ID will be
+         * automatically extracted from the URL.
          *
          * @param account {@link java.lang.String}
          * @return {@code this}
@@ -115,7 +117,6 @@ public final class SnowflakeClientConfig implements Serializable {
         public SnowflakeClientConfigBuilder accountId(final String account) {
             Preconditions.checkArgument(
                     !StringUtils.isNullOrWhitespaceOnly(account), "Invalid accountId");
-            // TODO make optional by parsing accountId from URL, if not provided explicitly
             this.connectionProps.put(ClientOptions.ACCOUNT_ID.key(), account);
             return this;
         }
@@ -188,18 +189,28 @@ public final class SnowflakeClientConfig implements Serializable {
         /**
          * Build a {@link SnowflakeClientConfig} from user-provided client configurations. This
          * method validates the connection properties to ensure all required settings are present.
+         * If accountId is not explicitly provided, it will be extracted from the URL.
          *
          * @return {@link SnowflakeClientConfig}
          */
         public SnowflakeClientConfig build() {
+            // Extract accountId from URL if not explicitly provided
+            if (!this.connectionProps.containsKey(ClientOptions.ACCOUNT_ID.key())
+                    && this.connectionProps.containsKey(ClientOptions.URL.key())) {
+                String url = this.connectionProps.getProperty(ClientOptions.URL.key());
+                String extractedAccountId = this.extractAccountIdFromUrl(url);
+                if (extractedAccountId != null) {
+                    this.connectionProps.put(ClientOptions.ACCOUNT_ID.key(), extractedAccountId);
+                }
+            }
             this.checkConnectionProps();
             return new SnowflakeClientConfig(this);
         }
 
         /**
          * Validates the connection properties to ensure all required settings are present. Required
-         * properties: URL, USER, and ROLE. Also validates that if key passphrase is provided,
-         * private key must also be present.
+         * properties: URL, USER, and ROLE. ACCOUNT_ID is optional as it can be extracted from URL.
+         * Also validates that if key passphrase is provided, private key must also be present.
          */
         void checkConnectionProps() {
 
@@ -211,10 +222,15 @@ public final class SnowflakeClientConfig implements Serializable {
                                     List.of(
                                             ClientOptions.URL.key(),
                                             ClientOptions.USER.key(),
-                                            ClientOptions.ROLE.key(),
-                                            ClientOptions.ACCOUNT_ID.key())),
+                                            ClientOptions.ROLE.key())),
                     "Required connection properties documented by Snowflake must be set, provided properties: %s",
                     this.connectionProps.keySet());
+
+            // Ensure accountId is present (either explicitly set or extracted from URL)
+            Preconditions.checkArgument(
+                    this.connectionProps.containsKey(ClientOptions.ACCOUNT_ID.key()),
+                    "Account ID must be either explicitly provided or extractable from the URL. "
+                            + "Expected URL format: https://<account_id>.snowflakecomputing.com");
 
             // key passphrase requires private key
             if (this.connectionProps.containsKey(ClientOptions.PRIVATE_KEY_PASSPHRASE.key())) {
@@ -224,6 +240,52 @@ public final class SnowflakeClientConfig implements Serializable {
                         ClientOptions.PRIVATE_KEY_PASSPHRASE.key(),
                         ClientOptions.PRIVATE_KEY.key());
             }
+        }
+
+        /**
+         * Extracts the account identifier from a Snowflake URL. Expected URL format: {@code
+         * https://<account_id>.snowflakecomputing.com}
+         *
+         * @param url the Snowflake connection URL
+         * @return the extracted account ID, or null if it cannot be extracted
+         */
+        private String extractAccountIdFromUrl(String url) {
+            if (StringUtils.isNullOrWhitespaceOnly(url)) {
+                return null;
+            }
+
+            try {
+                // Remove protocol if present
+                String cleanUrl = url.toLowerCase().trim();
+                if (cleanUrl.startsWith("https://")) {
+                    cleanUrl = cleanUrl.substring(8);
+                } else if (cleanUrl.startsWith("http://")) {
+                    cleanUrl = cleanUrl.substring(7);
+                }
+
+                // Remove port if present
+                int portIndex = cleanUrl.indexOf(':');
+                if (portIndex > 0) {
+                    cleanUrl = cleanUrl.substring(0, portIndex);
+                }
+
+                // Remove path if present
+                int pathIndex = cleanUrl.indexOf('/');
+                if (pathIndex > 0) {
+                    cleanUrl = cleanUrl.substring(0, pathIndex);
+                }
+
+                // Extract account ID (part before .snowflakecomputing.com)
+                if (cleanUrl.contains(".snowflakecomputing.com")) {
+                    int dotIndex = cleanUrl.indexOf(".snowflakecomputing.com");
+                    return cleanUrl.substring(0, dotIndex);
+                }
+            } catch (Exception e) {
+                // If any parsing error occurs, return null to let validation handle it
+                return null;
+            }
+
+            return null;
         }
 
         private SnowflakeClientConfigBuilder() {}
