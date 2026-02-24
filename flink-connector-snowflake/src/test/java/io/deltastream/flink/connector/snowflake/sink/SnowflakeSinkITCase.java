@@ -9,6 +9,7 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 
 import org.apache.flink.shaded.guava33.com.google.common.collect.Maps;
 
+import io.deltastream.flink.connector.snowflake.sink.config.ObservabilityConfig;
 import io.deltastream.flink.connector.snowflake.sink.context.SnowflakeSinkContext;
 import io.deltastream.flink.connector.snowflake.sink.serialization.SnowflakeRowSerializationSchema;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +62,7 @@ class SnowflakeSinkITCase {
                         .user(user)
                         .role(role)
                         .accountId(accountId)
+                        .observability(ObservabilityConfig.builder().enableMetrics())
                         .database("FLINK_STREAMING")
                         .schema("PUBLIC")
                         .table("\"stream_data_tbl\"") // case-sensitive table name

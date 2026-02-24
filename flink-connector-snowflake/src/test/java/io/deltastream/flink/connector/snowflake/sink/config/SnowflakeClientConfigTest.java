@@ -154,4 +154,140 @@ class SnowflakeClientConfigTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid accountId");
     }
+
+    @Test
+    void testBuildWithDefaultObservabilityConfig() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("myorg-myaccount")
+                        .build();
+
+        Assertions.assertThat(config.getObservabilityConfig()).isNotNull();
+        Assertions.assertThat(config.getObservabilityConfig().isEnableMetrics()).isFalse();
+    }
+
+    @Test
+    void testBuildWithCustomObservabilityConfig() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("myorg-myaccount")
+                        .observability(
+                                obs ->
+                                        obs.enableMetrics()
+                                                .metricsPort(9090)
+                                                .metricsIp("0.0.0.0")
+                                                .logLevel(ObservabilityConfig.LogLevel.WARN))
+                        .build();
+
+        ObservabilityConfig obsConfig = config.getObservabilityConfig();
+        Assertions.assertThat(obsConfig).isNotNull();
+        Assertions.assertThat(obsConfig.isEnableMetrics()).isTrue();
+        Assertions.assertThat(obsConfig.getMetricsPort()).isEqualTo(9090);
+        Assertions.assertThat(obsConfig.getMetricsIp()).isEqualTo("0.0.0.0");
+        Assertions.assertThat(obsConfig.getLogLevel()).isEqualTo(ObservabilityConfig.LogLevel.WARN);
+    }
+
+    @Test
+    void testBuildWithObservabilityOnlyMetricsEnabled() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("myorg-myaccount")
+                        .observability(obs -> obs.enableMetrics())
+                        .build();
+
+        ObservabilityConfig obsConfig = config.getObservabilityConfig();
+        Assertions.assertThat(obsConfig.isEnableMetrics()).isTrue();
+        // Other values should have defaults
+        Assertions.assertThat(obsConfig.getMetricsPort())
+                .isEqualTo(ClientOptions.Observability.METRICS_PORT_DEFAULT);
+        Assertions.assertThat(obsConfig.getMetricsIp())
+                .isEqualTo(ClientOptions.Observability.METRICS_IP_DEFAULT);
+        Assertions.assertThat(obsConfig.getLogLevel())
+                .isEqualTo(ClientOptions.Observability.LOG_LEVEL_DEFAULT);
+    }
+
+    @Test
+    void testBuildWithObservabilityOnlyLogLevel() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("myorg-myaccount")
+                        .observability(obs -> obs.logLevel(ObservabilityConfig.LogLevel.ERROR))
+                        .build();
+
+        ObservabilityConfig obsConfig = config.getObservabilityConfig();
+        Assertions.assertThat(obsConfig.getLogLevel())
+                .isEqualTo(ObservabilityConfig.LogLevel.ERROR);
+        Assertions.assertThat(obsConfig.isEnableMetrics()).isFalse(); // default
+    }
+
+    @Test
+    void testBuildWithNullObservabilityConfigurer() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SnowflakeClientConfig.builder()
+                                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                                        .user("testuser")
+                                        .role("testrole")
+                                        .accountId("myorg-myaccount")
+                                        .observability(null)
+                                        .build())
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("observabilityConfigurer");
+    }
+
+    @Test
+    void testBuildWithAllConnectionAndObservabilityOptions() {
+        SnowflakeClientConfig config =
+                SnowflakeClientConfig.builder()
+                        .url("https://myorg-myaccount.snowflakecomputing.com")
+                        .user("testuser")
+                        .role("testrole")
+                        .accountId("myorg-myaccount")
+                        .privateKey("test-private-key")
+                        .keyPassphrase("test-passphrase")
+                        .observability(
+                                obs ->
+                                        obs.enableMetrics()
+                                                .metricsPort(50000)
+                                                .metricsIp("127.0.0.1")
+                                                .logLevel(ObservabilityConfig.LogLevel.INFO))
+                        .build();
+
+        // Verify connection properties
+        Assertions.assertThat(config.getConnectionProps().getProperty(ClientOptions.URL.key()))
+                .isEqualTo("https://myorg-myaccount.snowflakecomputing.com");
+        Assertions.assertThat(config.getConnectionProps().getProperty(ClientOptions.USER.key()))
+                .isEqualTo("testuser");
+        Assertions.assertThat(config.getConnectionProps().getProperty(ClientOptions.ROLE.key()))
+                .isEqualTo("testrole");
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.ACCOUNT_ID.key()))
+                .isEqualTo("myorg-myaccount");
+        Assertions.assertThat(
+                        config.getConnectionProps().getProperty(ClientOptions.PRIVATE_KEY.key()))
+                .isEqualTo("test-private-key");
+        Assertions.assertThat(
+                        config.getConnectionProps()
+                                .getProperty(ClientOptions.PRIVATE_KEY_PASSPHRASE.key()))
+                .isEqualTo("test-passphrase");
+
+        // Verify observability config
+        ObservabilityConfig obsConfig = config.getObservabilityConfig();
+        Assertions.assertThat(obsConfig.isEnableMetrics()).isTrue();
+        Assertions.assertThat(obsConfig.getMetricsPort()).isEqualTo(50000);
+        Assertions.assertThat(obsConfig.getMetricsIp()).isEqualTo("127.0.0.1");
+        Assertions.assertThat(obsConfig.getLogLevel()).isEqualTo(ObservabilityConfig.LogLevel.INFO);
+    }
 }

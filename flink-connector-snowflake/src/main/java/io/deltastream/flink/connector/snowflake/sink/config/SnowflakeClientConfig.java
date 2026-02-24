@@ -26,6 +26,7 @@ import io.deltastream.flink.connector.snowflake.sink.internal.ClientOptions;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 /**
  * This class provides the configuration needed to create a Snowflake client connection. It handles
@@ -37,13 +38,19 @@ public final class SnowflakeClientConfig implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final Properties connectionProps;
+    private final ObservabilityConfig observabilityConfig;
 
     public Properties getConnectionProps() {
         return connectionProps;
     }
 
+    public ObservabilityConfig getObservabilityConfig() {
+        return observabilityConfig;
+    }
+
     private SnowflakeClientConfig(SnowflakeClientConfigBuilder builder) {
         this.connectionProps = builder.connectionProps;
+        this.observabilityConfig = builder.observabilityConfig;
     }
 
     public static SnowflakeClientConfigBuilder builder() {
@@ -55,6 +62,7 @@ public final class SnowflakeClientConfig implements Serializable {
     public static class SnowflakeClientConfigBuilder {
 
         private final Properties connectionProps = new Properties();
+        private ObservabilityConfig observabilityConfig = ObservabilityConfig.builder().build();
 
         /**
          * Set the connection URL for connecting to the Snowflake service.
@@ -139,6 +147,41 @@ public final class SnowflakeClientConfig implements Serializable {
                     String.format("Invalid %s", ClientOptions.PRIVATE_KEY_PASSPHRASE.key()));
             this.connectionProps.put(
                     ClientOptions.PRIVATE_KEY_PASSPHRASE.key(), connectionKeyPassphrase);
+            return this;
+        }
+
+        // ====================================================================
+        // Observability configuration
+        // ====================================================================
+
+        /**
+         * Configures observability settings for the Snowflake Streaming Ingest SDK. Use this method
+         * to configure metrics collection and logging levels.
+         *
+         * <p>Example usage:
+         *
+         * <pre>{@code
+         * SnowflakeSink.<T>builder()
+         *     .observability(obs -> obs
+         *         .enableMetrics()
+         *         .metricsPort(50000)
+         *         .metricsIp("0.0.0.0")
+         *         .logLevel(LogLevel.INFO))
+         *     .build("my-app-id");
+         * }</pre>
+         *
+         * @param observabilityConfigurer a consumer that configures the {@link
+         *     ObservabilityConfig.ObservabilityConfigBuilder}
+         * @return {@code this}
+         */
+        public SnowflakeClientConfigBuilder observability(
+                final Consumer<ObservabilityConfig.ObservabilityConfigBuilder>
+                        observabilityConfigurer) {
+            Preconditions.checkNotNull(observabilityConfigurer, "observabilityConfigurer");
+            ObservabilityConfig.ObservabilityConfigBuilder tmpBuilder =
+                    ObservabilityConfig.builder();
+            observabilityConfigurer.accept(tmpBuilder);
+            this.observabilityConfig = tmpBuilder.build();
             return this;
         }
 

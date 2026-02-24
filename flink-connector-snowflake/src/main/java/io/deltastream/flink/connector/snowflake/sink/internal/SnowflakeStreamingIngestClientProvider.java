@@ -18,9 +18,11 @@
 package io.deltastream.flink.connector.snowflake.sink.internal;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.util.Preconditions;
 
 import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClientFactory;
+import io.deltastream.flink.connector.snowflake.sink.config.ObservabilityConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,24 +37,6 @@ public class SnowflakeStreamingIngestClientProvider {
             LoggerFactory.getLogger(SnowflakeStreamingIngestClientProvider.class);
 
     private static final String STREAMING_INGEST_CLIENT_PREFIX_NAME = "FLINK_INGEST_CLIENT";
-
-    /**
-     * Local representation of Snowflake streaming ingest client configuration keys and defaults. <a
-     * href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance
-     * -configurations#environment-variables">Environment Variables</a>
-     */
-    public static final String ENABLE_METRICS_CONFIGURATION_KEY = "SS_ENABLE_METRICS";
-
-    public static final String ENABLE_METRICS_DEFAULT = "FALSE";
-    public static final String METRICS_PORT_CONFIGURATION_KEY = "SS_METRICS_PORT";
-    public static final int METRICS_PORT_DEFAULT = 50000;
-    public static final String METRICS_IP_CONFIGURATION_KEY = "SS_METRICS_IP";
-    public static final String METRICS_IP_DEFAULT = "127.0.0.1";
-    public static final String LOG_LEVEL_CONFIGURATION_KEY = "SS_LOG_LEVEL";
-    // Options: info, warn, error
-    public static final String LOG_LEVEL_DEFAULT = "info";
-
-    /*======= End of Environment Variables =======*/
 
     /**
      * Created based on the Snowflake client APIs and configuration. See <a
@@ -71,6 +55,10 @@ public class SnowflakeStreamingIngestClientProvider {
             final String schemaName,
             final String tableName,
             final SnowflakeClientConfig config) {
+
+        // set observability system properties before creating the client
+        configureObservability(config.getObservabilityConfig());
+
         final String ingestClientName =
                 SnowflakeInternalUtils.createClientOrChannelName(
                         STREAMING_INGEST_CLIENT_PREFIX_NAME, ingestName, null);
@@ -87,5 +75,38 @@ public class SnowflakeStreamingIngestClientProvider {
         LOGGER.info(
                 "Successfully initialized Snowflake streaming ingest client {}", ingestClientName);
         return ingestClient;
+    }
+
+    /**
+     * Sets the observability configuration as system properties. The Snowflake SDK checks system
+     * properties before environment variables, so setting them here allows the configuration to be
+     * controlled programmatically.
+     *
+     * @param observabilityConfig {@link ObservabilityConfig}
+     */
+    private static void configureObservability(final ObservabilityConfig observabilityConfig) {
+        Preconditions.checkNotNull(observabilityConfig, "observabilityConfig");
+
+        System.setProperty(
+                ClientOptions.Observability.ENABLE_METRICS_KEY,
+                String.valueOf(observabilityConfig.isEnableMetrics()).toUpperCase());
+        System.setProperty(
+                ClientOptions.Observability.METRICS_PORT_KEY,
+                String.valueOf(observabilityConfig.getMetricsPort()));
+        System.setProperty(
+                ClientOptions.Observability.METRICS_IP_KEY, observabilityConfig.getMetricsIp());
+        System.setProperty(
+                ClientOptions.Observability.LOG_LEVEL_KEY, observabilityConfig.getLogLevelValue());
+
+        LOGGER.info(
+                "Set Snowflake SDK observability system properties: [{}={}, {}={}, {}={}, {}={}]",
+                ClientOptions.Observability.ENABLE_METRICS_KEY,
+                observabilityConfig.isEnableMetrics(),
+                ClientOptions.Observability.METRICS_PORT_KEY,
+                observabilityConfig.getMetricsPort(),
+                ClientOptions.Observability.METRICS_IP_KEY,
+                observabilityConfig.getMetricsIp(),
+                ClientOptions.Observability.LOG_LEVEL_KEY,
+                observabilityConfig.getLogLevelValue());
     }
 }

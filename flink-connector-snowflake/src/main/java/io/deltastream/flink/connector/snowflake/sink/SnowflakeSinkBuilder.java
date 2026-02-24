@@ -22,6 +22,7 @@ import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 
+import io.deltastream.flink.connector.snowflake.sink.config.ObservabilityConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeChannelConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeClientConfig;
 import io.deltastream.flink.connector.snowflake.sink.config.SnowflakeWriterConfig;
@@ -217,15 +218,44 @@ public class SnowflakeSinkBuilder<IN> {
         return this;
     }
 
+    // ====================================================================
+    // Observability configuration
+    // ====================================================================
+
+    /**
+     * Configures observability settings for the Snowflake Streaming Ingest SDK. Use this method to
+     * configure metrics collection and logging levels.
+     *
+     * <p>Example usage:
+     *
+     * <pre>{@code
+     * SnowflakeSink.<T>builder()
+     *     .observability(obs -> obs
+     *         .enableMetrics()
+     *         .metricsPort(50000)
+     *         .metricsIp("0.0.0.0")
+     *         .logLevel(LogLevel.INFO))
+     *     .build("my-app-id");
+     * }</pre>
+     *
+     * @param observabilityConfigurer a consumer that configures the {@link
+     *     ObservabilityConfig.ObservabilityConfigBuilder}
+     * @return {@code this}
+     */
+    public SnowflakeSinkBuilder<IN> observability(
+            final ObservabilityConfig.ObservabilityConfigBuilder observabilityConfigurer) {
+        Preconditions.checkNotNull(observabilityConfigurer, "observabilityConfigurer");
+        this.clientConfigBuilder.observability(
+                ObservabilityConfig.ObservabilityConfigBuilder::build);
+        return this;
+    }
+
     /**
      * Creates a {@link SnowflakeSink} with provided configuration.
      *
      * @return {@link SnowflakeSink}
      */
     public SnowflakeSink<IN> build(final String appId) {
-        // TODO expose environment-based configuration options:
-        // TODO
-        // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations#environment-variables
         return new SnowflakeSink<>(
                 appId,
                 this.clientConfigBuilder.build(),

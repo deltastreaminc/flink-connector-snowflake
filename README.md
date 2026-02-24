@@ -53,6 +53,12 @@ class test {
             .database("DB_NAME")
             .schema("SCHEMA_NAME")
             .table("TABLE_NAME")
+            .observability(
+                ObservabilityConfig.builder()
+                    .enableMetrics()
+                    .metricsPort(53467)
+                    .metricsIp("172.17.0.2")
+                    .logLevel(ObservabilityConfig.LogLevel.WARN))
             .serializationSchema(SnowflakeRowSerializationSchemaImpl)
             .build("job_name_or_id");
 }
@@ -66,9 +72,32 @@ where:
 * `database` is the database name within the Snowflake account. See note below about case sensitivity.
 * `schema` is the schema name within the Snowflake account. See note below about case sensitivity.
 * `table` is the table name within the Snowflake account. See note below about case sensitivity.
+* `observability` is the configuration for the observability features of the connector, such as metrics and logging. See the [Observability](#observability) section below for more details.
 * `serializationSchema` is the serialization schema implementation of `SnowflakeRowSerializationSchema` to use to convert records to Snowflake rows.
 
 In Snowflake, the full name of a table is case-insensitive, but UPPER_CASE biased. In other words, a sink configured with a fully qualified name of `DB.SCHEMA.table` is treated as `DB.SCHEMA.TABLE`. To be able to use case-sensitive name parts, add double quotes around them to be treated as the literal name, e.g. `DB.SCHEMA."table"`.
+
+## Observability
+
+The connector provides built-in support for observability features such as metrics and logging. To enable these features, use the `observability` method in the builder to configure the desired settings.
+
+### Metrics
+
+The connector can generate Prometheus metrics for monitoring the performance and health of the sink. To configure Prometheus metrics exporter, the following APIs of the `ObservabilityConfigBuilder` can be used:
+  * `enableMetrics`: Enable the generation of Prometheus metrics (disabled by default)
+  * `metricsIp`: Configure the IP address to expose the Prometheus metrics (default: `127.0.0.1`)
+  * `metricsPort`: Configure the port to expose the Prometheus metrics (default: `50000`)
+
+Once configured, the metrics are exposed at `http://<metricsIp>:<metricsPort>`.
+
+## Logging
+
+By default, the connector configures a log level of `INFO`. To change the log level, use the `logLevel` API of the `ObservabilityConfigBuilder` when configuring the sink as shown in API examples.
+
+The supported log levels are:
+  * `INFO` (default)
+  * `ERROR`
+  * `WARN`
 
 ## Checkpointing with Flink
 
