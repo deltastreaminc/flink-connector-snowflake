@@ -161,7 +161,7 @@
                             </artifactSet>
                             <filters>
                                 <filter>
-                                    <artifact>com.snowflake:snowflake-ingest-sdk</artifact>
+                                    <artifact>com.snowflake:snowpipe-streaming</artifact>
                                     <excludes>
                                         <exclude>META-INF/io.netty.versions.properties</exclude>
                                     </excludes>
@@ -177,12 +177,7 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <relocations>
-                                <relocation>
-                                    <pattern>com.snowflake</pattern>
-                                    <shadedPattern>org.apache.flink.shaded.com.snowflake</shadedPattern>
-                                </relocation>
-                            </relocations>
+                            <!-- Snowflake SDK should not be relocated since it's used by the Java native libs -->
                         </configuration>
                     </execution>
                 </executions>
